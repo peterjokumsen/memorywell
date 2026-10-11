@@ -1,9 +1,13 @@
 # Phase 1 Brief — Foundation
 
-> Status: in progress (2026-10-11). Bicep subscription deployment + `az acr
-> build` + `containerapp update` + `/health` retry check all implemented in
-> `scripts/deploy.sh`; review gate evidence (FQDN, revision list, redeploy)
-> still to be pasted. Human builds by hand. Agent unblocks only.
+> Status: complete pending commit (2026-10-11). Bicep subscription deployment
++ `az acr
+build` (floating env tag + unique timestamp tag) + `containerapp update`
+to timestamp tag + `/health` retry check all implemented in
+> `scripts/deploy.sh` and run live; FQDN + `/health` ok, ≥2 revisions,
+> `teardown.sh --purge-vault` evidenced in chat; 2× scratch redeploys from
+> absent RG reported. Left: remove `deploy-log`, commit, `git status`
+> self-check. Human builds by hand. Agent unblocks only.
 
 ## 1. Goal
 
@@ -64,17 +68,21 @@ later phases.
 5. **`scripts/deploy.sh` (implemented).** `az deployment sub create` with
    parameters, `IMAGE` exported for `main.bicepparam` (falls back to
    Container Apps helloworld image when the ACR/repo does not exist yet —
-   expected on first deploy), `az acr build -r <registry> -t api:<env> ./api`,
-   `az containerapp update --image <registry>/api:<env>` (creates revision 2
-   — this is the revision-management proof), then `/health` poll
+   expected on first deploy), `az acr build -r <registry> -t api:<env> -t
+api:<env>-<timestamp> ./api` (floating env tag + unique timestamp tag
+   derived from `DEPLOYMENT_NAME` in `scripts/common.sh`), `az containerapp
+update --image <registry>/api:<env>-<timestamp>` (unique tag string
+   guarantees a new revision on every run — this is the
+   revision-management proof), then `/health` poll
    (`curl --max-time 5`, retry every 5s, up to ~60s for ACR pull +
-   scale-from-zero).
+   scale-from-zero). Refuses to deploy while the RG is still in `Deleting`
+   state (async teardown drain — retry once `az group show` no longer
+   returns the group).
 6. **`scripts/teardown.sh` (implemented).** Deletes the resource group
-   (`az group delete --name <rg> --yes --no-wait`) then purges the
-   soft-deleted Key Vault (`kv-<base>-<env>`) so same-name redeploys do not
-   conflict. Must work from a fresh shell with only `.env` values. Purge may
-   legitimately skip when the async delete has not soft-deleted the vault yet
-   — see the hint printed on skip. Test it once (see §6).
+   (`az group delete --name <rg> --yes --no-wait`); pass `--purge-vault` to
+   also wait for (up to ~5 min) and purge the soft-deleted Key Vault
+   (`kv-<base>-<env>`) so same-name redeploys do not conflict. Must work from
+   a fresh shell with only `.env` values. Test it once (see §6).
 7. **`.env` hygiene.** Local-only `.env` (already git-ignored) holds
    subscription ID, RG name, registry name. Nothing secret committed.
    Run `git status` — only intended files staged.
@@ -95,8 +103,8 @@ api/main.py                 # FastAPI app, ~15 lines: two routes, nothing else �
 api/requirements.txt        # fastapi, uvicorn (+ httpx/pytest for TestClient self-test) ✅
 api/Dockerfile              # FROM python:3.11-slim, COPY, EXPOSE 8000, CMD uvicorn ✅ (+ non-root user)
 api/tests/test_main.py      # /health + /ready assertions ✅
-scripts/deploy.sh           # sub deploy ✅; IMAGE fallback ✅; acr build + containerapp update ✅; /health retry ✅
-scripts/common.sh           # .env loader + RG_NAME/log_vars shared by scripts; timestamped DEPLOYMENT_NAME (see below)
+scripts/deploy.sh           # sub deploy ✅; IMAGE fallback ✅; acr build (env + timestamp tags) + containerapp update to timestamp tag ✅; /health retry ✅
+scripts/common.sh           # .env loader + RG_NAME/log_vars shared by scripts; timestamped DEPLOYMENT_NAME (see below) + derived IMAGE_TAG (<env>-YYYYmmdd-HHMMSS, unique per run so each update mints a new revision); color helpers step/info/success/warn/error (TTY-only, NO_COLOR-aware)
 scripts/teardown.sh         # az group delete + Key Vault purge ✅
 .env.example                # BASE_NAME/ENVIRONMENT/LOCATION/SUBSCRIPTION_ID template (no secrets)
 docs/phase-1-brief.md       # this file
@@ -152,19 +160,31 @@ CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
 - [x] `az deployment sub create` via `scripts/deploy.sh` succeeds (Bicep
       compiles clean: `az bicep build --file infra/main.bicep`); portal shows
       RG with Log Analytics, Key Vault, ACR, Container Apps env + app.
-- [x] Code path done: `az acr build` + `az containerapp update` implemented;
-      `/health` retry loop (`--max-time 5`, 5s sleep, 12 attempts) in place.
-      Live run still to paste: `curl https://<api-fqdn>/health` → `{"status":"ok"}`.
-- [ ] `az containerapp revision list` shows ≥2 revisions with latest active —
-      run and paste output.
-- [x] `scripts/teardown.sh` deletes the RG + purges soft-deleted Key Vault
-      (purge skips cleanly when async delete has not soft-deleted yet).
-- [ ] Redeploy from scratch works (proves no portal click-ops) — run once,
-      paste logs.
+- [x] Code path done and run live: `az acr build` (env + timestamp tags) +
+      `az containerapp update` to timestamp tag; `/health` retry loop
+      (`--max-time 5`, 5s sleep, 12 attempts) returned `{"status":"ok"}`
+      after 3 attempts at
+      `https://ca-memwell-dev.agreeableforest-d1c26f62.westeurope.azurecontainerapps.io/health`
+      (deployment `memwell-dev-20261011-194228`).
+- [x] `az containerapp revision list` shows 2 revisions with latest active
+      (evidenced 2026-10-11: `ca-memwell-dev--0000001` weight 0 +
+      `ca-memwell-dev--0000002` weight 100, both Healthy). Timestamp tag
+      (`api:<env>-<timestamp>`, `IMAGE_TAG` in `scripts/common.sh`) fixes
+      the same-tag no-new-revision behaviour.
+- [x] `scripts/teardown.sh --purge-vault` deletes the RG and purges the
+      soft-deleted Key Vault (evidenced 2026-10-11: 1 soft-delete wait
+      retry, `Teardown complete (resource group deleted, vault purged)`).
+- [x] Redeploy from scratch works (proves no portal click-ops) — reported
+      2026-10-11: 2× fresh deploys from absent RG after teardown.
 - [x] `git status --short` shows no `.env`, no secrets, no `functions/`/`web/`
       (`.python-version` now git-ignored as local toolchain hint).
+      `git log` paste waived — owner confirms log output is just commit
+      history. Self-check before commit: `git status --short` lists only
+      intended files. Still to do: remove untracked `deploy-log` at repo
+      root (verbose deploy output, do not commit).
 
 Notes (no open code TODOs):
+
 - Pre-deploy ACR tag check explicitly tolerates a missing registry/repo
   (first deploy → helloworld fallback, then real image via `acr build`).
 - `main.bicepparam` reads `IMAGE` from env — `deploy.sh` exports it, so the
@@ -174,12 +194,21 @@ Notes (no open code TODOs):
 
 Paste back into chat:
 
-1. `az containerapp show` FQDN + `curl /health` output.
-2. `az containerapp revision list --output table` (≥2 revisions).
-3. `scripts/deploy.sh` + `scripts/teardown.sh` run logs (success lines enough).
-4. `git status --short` + `git log --oneline -5`.
-5. One paragraph: subscription vs RG deployment choice, region choice, and what
-   you'd do differently.
+1. ✅ Received: `az containerapp show` FQDN + `curl /health` output
+   (`ca-memwell-dev.agreeableforest-d1c26f62.westeurope.azurecontainerapps.io`
+   → `{"status":"ok"}`).
+2. ✅ Received: `az containerapp revision list --output table` (2 revisions,
+   latest active at weight 100).
+3. ✅ Received: `scripts/teardown.sh --purge-vault` run log. Scratch-redeploy
+   reported (2× fresh deploys from absent RG) — logs not pasted, accepted
+   on report.
+4. ✅ Waived/accepted: `git log` paste not needed (commit history only).
+   Self-check before commit: `git status --short` shows only intended
+   files, no `.env`/secrets (`rm deploy-log`, do not commit it).
+5. ✅ Received (one paragraph): subscription preferred to be in charge of RG
+   from scratch, and westeurope so far has no issues. Would strip out
+   deploy.sh into their specific steps to allow for containerapp deployment
+   without having to re-deploy biceps.
 
 Agent sanity-checks the above, then issues the Phase 2 brief. No Phase 2 work
 starts until the gate passes. Cost reminder: destroy resources between sessions
