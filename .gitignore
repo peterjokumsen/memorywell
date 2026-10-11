@@ -223,3 +223,6 @@ __marimo__/
 node_modules/
 web/dist/
 web/build/
+
+# Bicep compiled output (local build artifact, never commit)
+infra/**/*.json

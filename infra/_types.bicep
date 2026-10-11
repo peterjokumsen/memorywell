@@ -7,6 +7,8 @@ type GlobalInputs = {
   location: string
   @description('The base name for all resources.')
   baseName: string
+  @description('Container image to use for the container app.')
+  containerImage: string
   @description('The environment name.')
   environment: EnvironmentType
 }

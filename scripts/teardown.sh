@@ -3,10 +3,17 @@
 # Destroys everything between study sessions. Cost control depends on this.
 set -euo pipefail
 
-# TODO: source local .env (never commit it) and set RG_NAME.
-: "${RG_NAME:=TODO-rg-name}"
+# prepare environment variables
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/common.sh"
 
-echo "TODO: az group delete --name $RG_NAME --yes --no-wait"
-echo "TODO: echo what was removed + verify with 'az group show'"
+log_vars \
+  "Subscription=$SUBSCRIPTION_ID" \
+  "Resource group=$RG_NAME"
 
-echo "teardown.sh outline only — fill TODOs, then implement."
+az account set --subscription $SUBSCRIPTION_ID
+
+echo "Groups in subscription $SUBSCRIPTION_ID:"
+az group list --query '[].name' -o tsv
+
+echo "Deleting resource group $RG_NAME..."
+az group delete --name $RG_NAME --yes --no-wait
