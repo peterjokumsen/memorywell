@@ -1,0 +1,33 @@
+# AGENTS.md — Memorywell
+
+> Source of truth: `docs/PLAN.md` (+ `docs/INITIAL_IDEA.md` for product context).
+> Do not diverge from the plan without updating it first.
+
+## Build mode: learning-first, agent-guided
+
+- The human builds by hand for AI-200 learning. The agent does **not** big-bang implement.
+- Work is strictly sequential, starting at **Phase 1**. One phase at a time, no skipping ahead, no pre-implementation of future phases.
+- Each phase follows this contract:
+  1. Agent writes `docs/phase-<n>-brief.md` with: goal, AI-200 concepts, prerequisites, ordered instructional steps, basic file outline (paths + stubs, **not** full implementations), manual verification checks, demo/review gate.
+  2. Human implements following the brief. Agent answers questions and unblocks on errors but does not take over.
+  3. Agent sanity-checks what was built (human pastes/shows output) before issuing the next phase brief.
+
+## Repo rules
+
+- Planned layout (`docs/PLAN.md` § Repo layout): `infra/ api/ functions/ web/ docs/ scripts/`. Scaffold only what the current phase brief needs.
+- Azure-first on the AI-200 stack; IaC is Bicep.
+- Cheapest viable SKUs (Cosmos serverless, Postgres Burstable B1s, Redis Basic, Container Apps scale-to-zero, Functions consumption). Estimated ~$50–90/mo while running.
+- `scripts/teardown.sh` must exist from early on; destroy resources between study sessions.
+- Secrets never committed. Managed identities + Key Vault references everywhere. `.env` stays local/ignored.
+
+## Domain invariants (do not break)
+
+- Circle of Care roles: N owners + Full Contributor + Observer + locked Recipient. Last-owner protection; `resolvedBy` audit on flag resolutions.
+- Per-(chronicle, contributor) `displayAlias` + `promptCadence` (`none` | `special-occasions` | `monthly` | `weekly`, default `monthly`); memories snapshot `aliasAtWriteTime`.
+- 3 event-driven agents only (Prompter, Curator, Guardian); coordination via Service Bus / Event Grid + Cosmos state — never direct calls.
+- Single-shot conversation now; schema stays multi-turn-ready (`promptId`, `parentMemoryId`, `turnCount`, `conversationId`).
+
+## Verification
+
+- Per-phase manual checks + `pytest` per agent as defined in `docs/PLAN.md` § Verification.
+- Final gate: scheduled check-in → voice-note reply → transcript in timeline → Guardian pass → review queue empty; plus alias-rename and flagged-content runs.
