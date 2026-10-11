@@ -19,19 +19,19 @@ on Azure) stack, which remains the core learning goal.
 
 ## Decisions
 
-| Topic | Decision |
-| --- | --- |
-| Interaction mode | Text/photo/voice-note based (messaging style + Drop Zone) |
-| Cloud | Azure-first - real resources on the AI-200 stack |
-| Scope | Family app now, designed for productization (auth, multi-tenant); Circle of Care from `INITIAL_IDEA.md` |
-| Cadence | Contributor-chosen per chronicle: none / special-occasions / monthly / weekly (default: monthly); plus on-demand + milestone nudges if cadence allows |
-| Agent replies | Text only (contributors reply with text, photo, or voice notes) |
-| Agents | 3 event-driven agents: Prompter/Nudger, Curator/Memory Keeper, Guardian/Reviewer (auto-apply after Guardian pass) |
-| Conversation | Single-shot now; schema is multi-turn-ready (`promptId`, `parentMemoryId`, `turnCount`, `conversationId`) |
-| Roles | N owners (both parents) + Full Contributor + Observer + locked Recipient (child); Owner = Contributor permissions + curate/review |
-| Aliases | Owner sets canonical name+relation on invite; contributor picks per-chronicle `displayAlias` (e.g. Gaga/Granny); natural-language rename ("you call me Granny") triggers update flow |
-| IaC | Bicep |
-| Subscription | Azure subscription ready to use |
+| Topic            | Decision                                                                                                                                                                             |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Interaction mode | Text/photo/voice-note based (messaging style + Drop Zone)                                                                                                                            |
+| Cloud            | Azure-first - real resources on the AI-200 stack                                                                                                                                     |
+| Scope            | Family app now, designed for productization (auth, multi-tenant); Circle of Care from `INITIAL_IDEA.md`                                                                              |
+| Cadence          | Contributor-chosen per chronicle: none / special-occasions / monthly / weekly (default: monthly); plus on-demand + milestone nudges if cadence allows                                |
+| Agent replies    | Text only (contributors reply with text, photo, or voice notes)                                                                                                                      |
+| Agents           | 3 event-driven agents: Prompter/Nudger, Curator/Memory Keeper, Guardian/Reviewer (auto-apply after Guardian pass)                                                                    |
+| Conversation     | Single-shot now; schema is multi-turn-ready (`promptId`, `parentMemoryId`, `turnCount`, `conversationId`)                                                                            |
+| Roles            | N owners (both parents) + Full Contributor + Observer + locked Recipient (child); Owner = Contributor permissions + curate/review                                                    |
+| Aliases          | Owner sets canonical name+relation on invite; contributor picks per-chronicle `displayAlias` (e.g. Gaga/Granny); natural-language rename ("you call me Granny") triggers update flow |
+| IaC              | Bicep                                                                                                                                                                                |
+| Subscription     | Azure subscription ready to use                                                                                                                                                      |
 
 ---
 
@@ -196,18 +196,18 @@ memorywell/
 3. Brief closes with a review gate: what to show / paste back so the agent can
    sanity-check before the next phase brief is issued.
 
-| # | Phase | Contents |
-| --- | --- | --- |
-| 1 | Foundation | Bicep: resource group, Log Analytics, Key Vault, App Config, ACR; skeleton API deployed to Container Apps (revision management day one) |
-| 2 | Data layer | Cosmos DB (chronicles/contributors/invites/memories/flags, indexing policy + vector), Postgres/pgvector, Managed Redis; multi-owner + alias fields; seed script |
-| 3 | Messaging | Service Bus queue/topic/DLQ (`memory.recorded`, `memory.flagged`, `alias.*`), Event Grid custom events, Functions (timer + SB + change feed + HTTP claim) |
-| 4a | Prompter | Persona system prompts, RAG question generation with alias injection + cadence filter, single-shot follow-ups; multi-turn fields written but gated off |
-| 4b | Curator | Metadata extraction + structured alias-intent output, canonical write + embedding wiring, conversation API |
-| 4c | Guardian | Classification/scoring, flag write + `memory.flagged`, alias validation + auto-apply path |
-| 5 | Frontend | Drop Zone + invite claim + alias picker + cadence picker, chat UI, voice/photo capture, timeline with threads/chapters, owner review queue, Easy Auth |
-| 6 | Voice/photo pipeline | Blob (tiering, compressed formats) -> Service Bus -> STT -> transcript back to Cosmos |
-| 7 | Observability | OpenTelemetry end-to-end, KQL workbook (incl. flag rate), DLQ alert |
-| 8 | Productization | Multi-household invites, milestone grouping polish, digest generation, JSON export / physical-book stub; freemium noted as future, out of scope |
+| #   | Phase                | Contents                                                                                                                                                        |
+| --- | -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Foundation           | Bicep: resource group, Log Analytics, Key Vault, App Config, ACR; skeleton API deployed to Container Apps (revision management day one)                         |
+| 2   | Data layer           | Cosmos DB (chronicles/contributors/invites/memories/flags, indexing policy + vector), Postgres/pgvector, Managed Redis; multi-owner + alias fields; seed script |
+| 3   | Messaging            | Service Bus queue/topic/DLQ (`memory.recorded`, `memory.flagged`, `alias.*`), Event Grid custom events, Functions (timer + SB + change feed + HTTP claim)       |
+| 4a  | Prompter             | Persona system prompts, RAG question generation with alias injection + cadence filter, single-shot follow-ups; multi-turn fields written but gated off          |
+| 4b  | Curator              | Metadata extraction + structured alias-intent output, canonical write + embedding wiring, conversation API                                                      |
+| 4c  | Guardian             | Classification/scoring, flag write + `memory.flagged`, alias validation + auto-apply path                                                                       |
+| 5   | Frontend             | Drop Zone + invite claim + alias picker + cadence picker, chat UI, voice/photo capture, timeline with threads/chapters, owner review queue, Easy Auth           |
+| 6   | Voice/photo pipeline | Blob (tiering, compressed formats) -> Service Bus -> STT -> transcript back to Cosmos                                                                           |
+| 7   | Observability        | OpenTelemetry end-to-end, KQL workbook (incl. flag rate), DLQ alert                                                                                             |
+| 8   | Productization       | Multi-household invites, milestone grouping polish, digest generation, JSON export / physical-book stub; freemium noted as future, out of scope                 |
 
 **Build starts at Phase 1** (full plan, sequential, one brief at a time — no
 skipping ahead, no agent pre-implementation).
@@ -240,9 +240,9 @@ skipping ahead, no agent pre-implementation).
 
 ## Name candidates (for reference)
 
-1. **Memorywell** *(chosen)* - drop memories in, draw them up later; neutral for
+1. **Memorywell** _(chosen)_ - drop memories in, draw them up later; neutral for
    multi-household productization
-2. **Little Voices** *(former)* - the daughters' voices (questions) now, their
+2. **Little Voices** _(former)_ - the daughters' voices (questions) now, their
    voices (answers) saved for later
 3. **Dear Future Us**
 4. **Timekeepers**
