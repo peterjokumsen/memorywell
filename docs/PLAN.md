@@ -198,7 +198,7 @@ memorywell/
 
 | #   | Phase                | Contents                                                                                                                                                        |
 | --- | -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | Foundation           | Bicep: resource group, Log Analytics, Key Vault, App Config, ACR; skeleton API deployed to Container Apps (revision management day one)                         |
+| 1   | Foundation           | Bicep: resource group, Log Analytics, Key Vault, ACR; skeleton API deployed to Container Apps (revision management day one; App Config deferred for cost/value — returns with Phase 4 keys) |
 | 2   | Data layer           | Cosmos DB (chronicles/contributors/invites/memories/flags, indexing policy + vector), Postgres/pgvector, Managed Redis; multi-owner + alias fields; seed script |
 | 3   | Messaging            | Service Bus queue/topic/DLQ (`memory.recorded`, `memory.flagged`, `alias.*`), Event Grid custom events, Functions (timer + SB + change feed + HTTP claim)       |
 | 4a  | Prompter             | Persona system prompts, RAG question generation with alias injection + cadence filter, single-shot follow-ups; multi-turn fields written but gated off          |
