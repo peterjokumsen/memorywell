@@ -1,16 +1,21 @@
 # Phase 1 Brief — Foundation
 
-> Status: in progress (2026-10-11). Bicep subscription deployment works via
-> `scripts/deploy.sh`; skeleton API + image build/update steps still pending.
-> Human builds by hand. Agent unblocks only.
+> Status: in progress (2026-10-11). Bicep subscription deployment + `az acr
+> build` + `containerapp update` + `/health` retry check all implemented in
+> `scripts/deploy.sh`; review gate evidence (FQDN, revision list, redeploy)
+> still to be pasted. Human builds by hand. Agent unblocks only.
 
 ## 1. Goal
 
 Provision the cheapest viable Azure foundation with Bicep and deploy a skeleton
 FastAPI container to Container Apps with revision management on day one.
 
-Deploys: resource group, Log Analytics, Key Vault, App Configuration, ACR,
+Deploys: resource group, Log Analytics, Key Vault, ACR,
 Container Apps environment + skeleton API app. Plus `scripts/teardown.sh`.
+
+App Configuration is deferred (see §5): no key-value load in Phase 1, so it
+adds cost/complexity without learning value yet. It returns when persona
+definitions / thresholds / feature flags land (Phases 4a–4c).
 
 Out of scope: Cosmos, Postgres, Redis, Service Bus, Event Grid, Functions,
 agents (4a–4c), frontend, voice/photo, observability wiring. No pre-building
@@ -20,9 +25,10 @@ later phases.
 
 - Containerized solutions: Dockerfile → ACR (ACR Tasks build) → Container Apps
   (environment config, revisions, scale-to-zero).
-- Connect/consume: Key Vault references + App Config values injected as env vars
+- Connect/consume: Key Vault references injected as env vars
   (managed identity where possible, even if only the API's identity is created
-  now and wired later).
+  now and wired later). App Config injection is deferred with the resource
+  (see §5).
 - Secure/monitor: Log Analytics attached to the Container Apps environment from
   day one; no secrets in repo.
 
@@ -43,9 +49,8 @@ later phases.
    Resources, cheapest SKUs:
    - Log Analytics workspace (PerGB2018).
    - Key Vault (standard SKU, RBAC authorization enabled, no secrets yet).
-   - App Configuration (free tier, no keys yet — one placeholder e.g.
-     `app:env = dev` is fine).
-   - ACR (Basic SKU).
+   - ACR (Basic SKU). (App Configuration intentionally omitted — deferred for
+     cost/value, see §5.)
    - Container Apps managed environment (wired to Log Analytics) + one
      Container App `api` (external ingress, target port 8000, minReplicas 0).
 3. **Split modules only if it helps you learn** (e.g. `infra/modules/acr.bicep`,
@@ -56,13 +61,20 @@ later phases.
    returning `{"status":"ok"}`; `api/requirements.txt` (fastapi + uvicorn);
    `api/Dockerfile` (slim python, expose 8000, run uvicorn). No agent code,
    no DB clients.
-5. **`scripts/deploy.sh`.** Steps: `az group create` (if RG scope), `az deployment
-... create` with parameters, `az acr build -r <registry> -t api:phase1 .`
-   from `api/`, `az containerapp update --image <registry>/api:phase1`
-   (creates revision 2 — this is the revision-management proof).
-6. **`scripts/teardown.sh`.** Deletes the resource group
-   (`az group delete --name <rg> --yes --no-wait` at minimum). Must work from a
-   fresh shell with only RG name / baseName as input. Test it once (see §6).
+5. **`scripts/deploy.sh` (implemented).** `az deployment sub create` with
+   parameters, `IMAGE` exported for `main.bicepparam` (falls back to
+   Container Apps helloworld image when the ACR/repo does not exist yet —
+   expected on first deploy), `az acr build -r <registry> -t api:<env> ./api`,
+   `az containerapp update --image <registry>/api:<env>` (creates revision 2
+   — this is the revision-management proof), then `/health` poll
+   (`curl --max-time 5`, retry every 5s, up to ~60s for ACR pull +
+   scale-from-zero).
+6. **`scripts/teardown.sh` (implemented).** Deletes the resource group
+   (`az group delete --name <rg> --yes --no-wait`) then purges the
+   soft-deleted Key Vault (`kv-<base>-<env>`) so same-name redeploys do not
+   conflict. Must work from a fresh shell with only `.env` values. Purge may
+   legitimately skip when the async delete has not soft-deleted the vault yet
+   — see the hint printed on skip. Test it once (see §6).
 7. **`.env` hygiene.** Local-only `.env` (already git-ignored) holds
    subscription ID, RG name, registry name. Nothing secret committed.
    Run `git status` — only intended files staged.
@@ -79,18 +91,34 @@ infra/modules/monitor.bicep  # Log Analytics (PerGB2018)
 infra/modules/acr.bicep      # ACR Basic + AcrPull role for the identity
 infra/modules/vault.bicep    # Key Vault standard, RBAC, Secrets User role
 infra/modules/containerapp.bicep # env (Log Analytics wired) + api app, port 8000, minReplicas 0
-api/main.py                 # FastAPI app, ~15 lines: two routes, nothing else — TODO, api/ empty
-api/requirements.txt        # fastapi, uvicorn — TODO
-api/Dockerfile              # FROM python:3.11-slim, COPY, EXPOSE 8000, CMD uvicorn — TODO
-scripts/deploy.sh           # sub deployment via Bicep ✅; acr build + containerapp update TODO
-scripts/common.sh           # .env loader + RG_NAME/DEPLOYMENT_NAME/log_vars shared by scripts
-scripts/teardown.sh         # az group delete; echo what was removed ✅
+api/main.py                 # FastAPI app, ~15 lines: two routes, nothing else ✅
+api/requirements.txt        # fastapi, uvicorn (+ httpx/pytest for TestClient self-test) ✅
+api/Dockerfile              # FROM python:3.11-slim, COPY, EXPOSE 8000, CMD uvicorn ✅ (+ non-root user)
+api/tests/test_main.py      # /health + /ready assertions ✅
+scripts/deploy.sh           # sub deploy ✅; IMAGE fallback ✅; acr build + containerapp update ✅; /health retry ✅
+scripts/common.sh           # .env loader + RG_NAME/log_vars shared by scripts; timestamped DEPLOYMENT_NAME (see below)
+scripts/teardown.sh         # az group delete + Key Vault purge ✅
 .env.example                # BASE_NAME/ENVIRONMENT/LOCATION/SUBSCRIPTION_ID template (no secrets)
 docs/phase-1-brief.md       # this file
 ```
 
-Dropped from Phase 1 scope (deferred, not deleted from PLAN): App Configuration
-(`infra/modules/appconfig.bicep` stub removed). `scripts/prepare.sh` outline
+Deployment naming (`scripts/common.sh`): every `deploy.sh`/`teardown.sh` run
+mints `DEPLOYMENT_NAME=<base>-<env>-YYYYmmdd-HHMMSS` (recorded in
+`$TMPDIR/memorywell-<base>-<env>.deployment`) because subscription-deployment
+names must be unique per `az deployment sub create` — re-using a name
+overwrites history and confuses `sub show` lookups. Set
+`REUSE_DEPLOYMENT=1` to re-run against the previous name when debugging a
+failed deployment.
+
+`.python-version` (content `3.11`) is a local `uv`/pyenv toolchain hint,
+auto-generated and git-ignored — the build pins `python:3.11-slim` in
+`api/Dockerfile` instead.
+
+Dropped from Phase 1 scope (deferred for cost/value, not deleted from PLAN):
+App Configuration — no key-values are consumed in Phase 1, so provisioning it
+adds cost/complexity with no learning payoff. The stub
+(`infra/modules/appconfig.bicep`) stays removed; it returns with persona /
+threshold / feature-flag keys in Phases 4a–4c. `scripts/prepare.sh` outline
 removed — superseded by `deploy.sh` + `common.sh`. `infra/main.json` is local
 `az bicep build` output, never committed.
 
@@ -124,22 +152,23 @@ CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
 - [x] `az deployment sub create` via `scripts/deploy.sh` succeeds (Bicep
       compiles clean: `az bicep build --file infra/main.bicep`); portal shows
       RG with Log Analytics, Key Vault, ACR, Container Apps env + app.
-- [ ] `curl https://<api-fqdn>/health` → `{"status":"ok"}` (needs api/ skeleton).
-- [ ] After step 5's image update, `az containerapp revision list` shows ≥2
-      revisions with the latest active (needs `deploy.sh` TODOs, lines 54–55).
-- [x] `scripts/teardown.sh` deletes the RG (`common.sh` shared env ✅).
-- [ ] Redeploy from scratch works (proves no portal click-ops) — run once
-      after the image steps land.
-- [x] `git status --short` shows no `.env`, no secrets, no `functions/`/`web/`.
+- [x] Code path done: `az acr build` + `az containerapp update` implemented;
+      `/health` retry loop (`--max-time 5`, 5s sleep, 12 attempts) in place.
+      Live run still to paste: `curl https://<api-fqdn>/health` → `{"status":"ok"}`.
+- [ ] `az containerapp revision list` shows ≥2 revisions with latest active —
+      run and paste output.
+- [x] `scripts/teardown.sh` deletes the RG + purges soft-deleted Key Vault
+      (purge skips cleanly when async delete has not soft-deleted yet).
+- [ ] Redeploy from scratch works (proves no portal click-ops) — run once,
+      paste logs.
+- [x] `git status --short` shows no `.env`, no secrets, no `functions/`/`web/`
+      (`.python-version` now git-ignored as local toolchain hint).
 
-Known issues in `scripts/deploy.sh` (fix when implementing step 5):
-- Lines 54–55 are still `TODO` echoes — `az acr build` + `az containerapp update`
-  not yet implemented.
-- Line 13 reads `$REGISTRY` before it is set (set at line 40 from deployment
-  outputs), so the tag check always falls back to the helloworld image.
-- `2>/null` should be `2>/dev/null`.
-- Computed `IMAGE` is never exported, so `main.bicepparam`'s
-  `readEnvironmentVariable('IMAGE', ...)` always sees the default.
+Notes (no open code TODOs):
+- Pre-deploy ACR tag check explicitly tolerates a missing registry/repo
+  (first deploy → helloworld fallback, then real image via `acr build`).
+- `main.bicepparam` reads `IMAGE` from env — `deploy.sh` exports it, so the
+  fallback vs real-image choice actually reaches Bicep.
 
 ## 7. Review gate (demo before Phase 2)
 
