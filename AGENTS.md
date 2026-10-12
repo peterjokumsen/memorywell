@@ -13,7 +13,7 @@
 - The human builds by hand for AI-200 learning. The agent does **not** big-bang implement.
 - Work is strictly sequential, starting at **Phase 1**. One phase at a time, no skipping ahead, no pre-implementation of future phases.
 - Each phase follows this contract:
-  1. Agent writes `docs/phase-<n>-brief.md` with: goal, AI-200 concepts, prerequisites, ordered instructional steps, basic file outline (paths + stubs, **not** full implementations), manual verification checks, demo/review gate.
+  1. Agent writes a per-phase directory `docs/phase-<n>/`: `_brief.md` (goal, AI-200 concepts, prerequisites, ordered-step index, basic file outline (paths + stubs, **not** full implementations), demo/review gate) plus one `step-x.md` per ordered step carrying that step's instructions, stub shapes/notes, and its manual verification checks.
   2. Human implements following the brief. Agent answers questions and unblocks on errors but does not take over.
   3. Agent sanity-checks what was built (human pastes/shows output) before issuing the next phase brief.
 

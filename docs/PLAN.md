@@ -188,10 +188,11 @@ memorywell/
 
 **Phase execution contract (applies to every phase below):**
 
-1. Agent writes a phase brief in `docs/phase-<n>-brief.md`: goal, AI-200 concepts,
-   prerequisites, instructional steps in order, basic file outline (paths +
-   stubs, not full implementations), manual verification checks, and what to
-   demo before proceeding.
+1. Agent writes a phase brief as `docs/phase-<n>/_brief.md`: goal, AI-200
+   concepts, prerequisites, the ordered-step index, basic file outline (paths +
+   stubs, not full implementations), and what to demo before proceeding. Each
+   ordered step gets its own `docs/phase-<n>/step-x.md` with that step's
+   instructions, stub shapes/notes, and manual verification checks.
 2. Human builds it by hand following the brief (agent answers questions,
    unblocks on errors, but does not take over implementation).
 3. Brief closes with a review gate: what to show / paste back so the agent can
