@@ -1,13 +1,16 @@
 # Phase 1 Brief — Foundation
 
-> Status: complete pending commit (2026-10-11). Bicep subscription deployment
-+ `az acr
-build` (floating env tag + unique timestamp tag) + `containerapp update`
-to timestamp tag + `/health` retry check all implemented in
+> Status: complete pending commit (2026-10-11). Bicep subscription deployment,
+> `az acr build` (floating env tag + unique timestamp tag) + `containerapp
+update` to timestamp tag + `/health` retry check all implemented in
 > `scripts/deploy.sh` and run live; FQDN + `/health` ok, ≥2 revisions,
 > `teardown.sh --purge-vault` evidenced in chat; 2× scratch redeploys from
 > absent RG reported. Left: remove `deploy-log`, commit, `git status`
 > self-check. Human builds by hand. Agent unblocks only.
+>
+> Update (2026-10-12): ACR moved to a shared resource group
+> (`infra/shared.bicep`, `scripts/deploy-shared.sh`); env template references
+> it as `existing` and grants `AcrPull` via `infra/modules/acr-pull.bicep`.
 
 ## 1. Goal
 
@@ -81,31 +84,42 @@ update --image <registry>/api:<env>-<timestamp>` (unique tag string
 6. **`scripts/teardown.sh` (implemented).** Deletes the resource group
    (`az group delete --name <rg> --yes --no-wait`); pass `--purge-vault` to
    also wait for (up to ~5 min) and purge the soft-deleted Key Vault
-   (`kv-<base>-<env>`) so same-name redeploys do not conflict. Must work from
+   (`kv-<base>-<env>`) so same-name redeploys do not conflict. Pass `--shared`
+   to also delete the shared RG (`rg-<base>-shared`), always after the env RG
+   so running apps never lose image pulls mid-teardown; without the flag the
+   shared RG and its images are kept across sessions. Must work from
    a fresh shell with only `.env` values. Test it once (see §6).
-7. **`.env` hygiene.** Local-only `.env` (already git-ignored) holds
+7. **`scripts/deploy-shared.sh` (implemented).** One-time shared deployment:
+   `az deployment sub create` against `infra/shared.bicep` (create/what-if),
+   with the same `Deleting`-RG guard as `deploy.sh`. Run before the first env
+   deploy.
+8. **`.env` hygiene.** Local-only `.env` (already git-ignored) holds
    subscription ID, RG name, registry name. Nothing secret committed.
    Run `git status` — only intended files staged.
 
 ## 5. File outline (stubs, not implementations)
 
 ```plaintext
-infra/main.bicep            # subscription scope: RG + platform module, outputs
-infra/main.bicepparam        # dev values from env (BASE_NAME, ENVIRONMENT, LOCATION, RG_NAME, IMAGE)
+infra/shared.bicep          # sub scope: shared RG (rg-<base>-shared) + ACR module, outputs registry/loginServer ✅
+infra/shared.bicepparam     # shared values from env (BASE_NAME, LOCATION, SHARED_RG_NAME) ✅
+infra/main.bicep            # subscription scope: RG + platform module, existing ACR ref + acr-pull module, outputs ✅
+infra/main.bicepparam        # dev values from env (BASE_NAME, ENVIRONMENT, LOCATION, RG_NAME, IMAGE, SHARED_RG_NAME, SHARED_ACR_NAME)
 infra/_types.bicep           # GlobalInputs, EnvironmentType
-infra/modules/platform.bicep # RG-scope composition: identity, monitor, acr, vault, containerapp
+infra/modules/platform.bicep # RG-scope composition: identity, monitor, vault, containerapp (takes acrLoginServer) ✅
 infra/modules/identity.bicep # user-assigned identity for the API app
 infra/modules/monitor.bicep  # Log Analytics (PerGB2018)
-infra/modules/acr.bicep      # ACR Basic + AcrPull role for the identity
+infra/modules/acr.bicep      # ACR Basic, deployed by shared.bicep (no role grants here) ✅
+infra/modules/acr-pull.bicep # AcrPull role for an env identity, deployed at the shared RG scope ✅
 infra/modules/vault.bicep    # Key Vault standard, RBAC, Secrets User role
 infra/modules/containerapp.bicep # env (Log Analytics wired) + api app, port 8000, minReplicas 0
 api/main.py                 # FastAPI app, ~15 lines: two routes, nothing else ✅
 api/requirements.txt        # fastapi, uvicorn (+ httpx/pytest for TestClient self-test) ✅
 api/Dockerfile              # FROM python:3.11-slim, COPY, EXPOSE 8000, CMD uvicorn ✅ (+ non-root user)
 api/tests/test_main.py      # /health + /ready assertions ✅
-scripts/deploy.sh           # sub deploy ✅; IMAGE fallback ✅; acr build (env + timestamp tags) + containerapp update to timestamp tag ✅; /health retry ✅
-scripts/common.sh           # .env loader + RG_NAME/log_vars shared by scripts; timestamped DEPLOYMENT_NAME (see below) + derived IMAGE_TAG (<env>-YYYYmmdd-HHMMSS, unique per run so each update mints a new revision); color helpers step/info/success/warn/error (TTY-only, NO_COLOR-aware)
-scripts/teardown.sh         # az group delete + Key Vault purge ✅
+scripts/deploy-shared.sh   # sub deploy of infra/shared.bicep (shared RG + ACR) ✅; fails fast on shared RG still Deleting ✅
+scripts/deploy.sh           # sub deploy ✅; requires shared RG/ACR (points at deploy-shared.sh when missing) ✅; IMAGE fallback ✅; acr build (env + timestamp tags) + containerapp update to timestamp tag ✅; /health retry ✅
+scripts/common.sh           # .env loader + RG_NAME/SHARED_RG_NAME/SHARED_ACR_NAME + registry_name()/login_server() helpers/log_vars shared by scripts; timestamped DEPLOYMENT_NAME (see below) + derived IMAGE_TAG (<env>-YYYYmmdd-HHMMSS, unique per run so each update mints a new revision); color helpers step/info/success/warn/error (TTY-only, NO_COLOR-aware)
+scripts/teardown.sh         # az group delete + Key Vault purge ✅; `--shared` also deletes the shared RG (env RG first) ✅
 .env.example                # BASE_NAME/ENVIRONMENT/LOCATION/SUBSCRIPTION_ID template (no secrets)
 docs/phase-1-brief.md       # this file
 ```

@@ -24,7 +24,7 @@
 - No pnpm workspace: when `web/` arrives (Phase 5), use a plain package manager inside `web/` only.
 - Azure-first on the AI-200 stack; IaC is Bicep.
 - Cheapest viable SKUs (Cosmos serverless, Postgres Burstable B1s, Redis Basic, Container Apps scale-to-zero, Functions consumption). Estimated ~$50–90/mo while running.
-- `scripts/teardown.sh` must exist from early on; destroy resources between study sessions.
+- `scripts/teardown.sh` must exist from early on; destroy resources between study sessions. The shared resource group (`rg-<base>-shared`, holds the cross-environment ACR) is kept by default — pass `--shared` to delete it too.
 - Secrets never committed. Managed identities + Key Vault references everywhere. `.env` stays local/ignored.
 
 ## Formatting (enforced by `.pre-commit-config.yaml`)

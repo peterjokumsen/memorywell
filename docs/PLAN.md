@@ -170,7 +170,8 @@ on Azure) stack, which remains the core learning goal.
 
 ```plaintext
 memorywell/
-  infra/        Bicep modules: acr, containerapps, cosmos, postgres, redis,
+  infra/        Bicep: shared.bicep (shared RG: ACR, future appconfig) +
+                modules acr, containerapps, cosmos, postgres, redis,
                 servicebus, eventgrid, functions, keyvault, appconfig, monitor
   api/          FastAPI container: prompter.py, curator.py, guardian.py, shared
                 rag.py, conversations, persona, voice/photo upload
@@ -196,18 +197,18 @@ memorywell/
 3. Brief closes with a review gate: what to show / paste back so the agent can
    sanity-check before the next phase brief is issued.
 
-| #   | Phase                | Contents                                                                                                                                                        |
-| --- | -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | Foundation           | Bicep: resource group, Log Analytics, Key Vault, ACR; skeleton API deployed to Container Apps (revision management day one; App Config deferred for cost/value — returns with Phase 4 keys) |
-| 2   | Data layer           | Cosmos DB (chronicles/contributors/invites/memories/flags, indexing policy + vector), Postgres/pgvector, Managed Redis; multi-owner + alias fields; seed script |
-| 3   | Messaging            | Service Bus queue/topic/DLQ (`memory.recorded`, `memory.flagged`, `alias.*`), Event Grid custom events, Functions (timer + SB + change feed + HTTP claim)       |
-| 4a  | Prompter             | Persona system prompts, RAG question generation with alias injection + cadence filter, single-shot follow-ups; multi-turn fields written but gated off          |
-| 4b  | Curator              | Metadata extraction + structured alias-intent output, canonical write + embedding wiring, conversation API                                                      |
-| 4c  | Guardian             | Classification/scoring, flag write + `memory.flagged`, alias validation + auto-apply path                                                                       |
-| 5   | Frontend             | Drop Zone + invite claim + alias picker + cadence picker, chat UI, voice/photo capture, timeline with threads/chapters, owner review queue, Easy Auth           |
-| 6   | Voice/photo pipeline | Blob (tiering, compressed formats) -> Service Bus -> STT -> transcript back to Cosmos                                                                           |
-| 7   | Observability        | OpenTelemetry end-to-end, KQL workbook (incl. flag rate), DLQ alert                                                                                             |
-| 8   | Productization       | Multi-household invites, milestone grouping polish, digest generation, JSON export / physical-book stub; freemium noted as future, out of scope                 |
+| #   | Phase                | Contents                                                                                                                                                                                                                                       |
+| --- | -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Foundation           | Bicep: shared resource group (ACR shared across envs; AppConfig deferred for cost/value — returns with Phase 4 keys) + env resource group with Log Analytics, Key Vault; skeleton API deployed to Container Apps (revision management day one) |
+| 2   | Data layer           | Cosmos DB (chronicles/contributors/invites/memories/flags, indexing policy + vector), Postgres/pgvector, Managed Redis; multi-owner + alias fields; seed script                                                                                |
+| 3   | Messaging            | Service Bus queue/topic/DLQ (`memory.recorded`, `memory.flagged`, `alias.*`), Event Grid custom events, Functions (timer + SB + change feed + HTTP claim)                                                                                      |
+| 4a  | Prompter             | Persona system prompts, RAG question generation with alias injection + cadence filter, single-shot follow-ups; multi-turn fields written but gated off                                                                                         |
+| 4b  | Curator              | Metadata extraction + structured alias-intent output, canonical write + embedding wiring, conversation API                                                                                                                                     |
+| 4c  | Guardian             | Classification/scoring, flag write + `memory.flagged`, alias validation + auto-apply path                                                                                                                                                      |
+| 5   | Frontend             | Drop Zone + invite claim + alias picker + cadence picker, chat UI, voice/photo capture, timeline with threads/chapters, owner review queue, Easy Auth                                                                                          |
+| 6   | Voice/photo pipeline | Blob (tiering, compressed formats) -> Service Bus -> STT -> transcript back to Cosmos                                                                                                                                                          |
+| 7   | Observability        | OpenTelemetry end-to-end, KQL workbook (incl. flag rate), DLQ alert                                                                                                                                                                            |
+| 8   | Productization       | Multi-household invites, milestone grouping polish, digest generation, JSON export / physical-book stub; freemium noted as future, out of scope                                                                                                |
 
 **Build starts at Phase 1** (full plan, sequential, one brief at a time — no
 skipping ahead, no agent pre-implementation).

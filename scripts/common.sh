@@ -27,6 +27,16 @@ fi
 
 export RG_NAME="rg-${BASE_NAME}-${ENVIRONMENT}"
 
+# Shared resource group + registry (created once by deploy-shared.sh, kept
+# across teardowns). The registry name drops the environment suffix so one ACR
+# serves every environment; `acr` prefix + stripped hyphens keep it valid and
+# globally unique.
+export SHARED_RG_NAME="rg-${BASE_NAME}-shared"
+export SHARED_ACR_NAME="$(echo "acr${BASE_NAME}" | tr '[:upper:]' '[:lower:]' | tr -d '-')"
+
+registry_name() { echo "$SHARED_ACR_NAME"; }
+login_server() { echo "${SHARED_ACR_NAME}.azurecr.io"; }
+
 # Subscription-deployment names must be unique per `az deployment sub create`
 # run: re-using a name overwrites history and can confuse `sub show` output
 # lookups. So each run gets a timestamped name

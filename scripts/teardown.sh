@@ -6,23 +6,30 @@ set -euo pipefail
 # prepare environment variables
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/common.sh"
 
-# Usage: teardown.sh [--purge-vault]
+# Usage: teardown.sh [--purge-vault] [--shared]
 #   --purge-vault  after deleting the RG, wait for the soft-deleted Key Vault
 #                  to appear and purge it so same-name redeploys do not conflict.
 #                  Without the flag, only the RG delete runs (fast, async).
+#   --shared       also delete the shared resource group (ACR). Not the default:
+#                  the shared RG survives study-session teardowns, and deleting
+#                  it first would break image pulls from any running app.
 if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
-  echo "Usage: $0 [--purge-vault]"
+  echo "Usage: $0 [--purge-vault] [--shared]"
   exit 0
 fi
-if [[ "${1:-}" == "--purge-vault" ]]; then
-  PURGE_VAULT=1
-elif [[ -n "${1:-}" ]]; then
-  error "Unknown argument: $1"
-  echo "Usage: $0 [--purge-vault]"
-  exit 1
-else
-  PURGE_VAULT=0
-fi
+PURGE_VAULT=0
+DELETE_SHARED=0
+for arg in "$@"; do
+  case "$arg" in
+    --purge-vault) PURGE_VAULT=1 ;;
+    --shared) DELETE_SHARED=1 ;;
+    *)
+      error "Unknown argument: $arg"
+      echo "Usage: $0 [--purge-vault] [--shared]"
+      exit 1
+      ;;
+  esac
+done
 
 VAULT_NAME="kv-${BASE_NAME}-${ENVIRONMENT}"
 
@@ -30,7 +37,8 @@ log_vars \
   "Subscription=$SUBSCRIPTION_ID" \
   "Resource group=$RG_NAME" \
   "KeyVault=$VAULT_NAME" \
-  "PurgeVault=$PURGE_VAULT"
+  "PurgeVault=$PURGE_VAULT" \
+  "DeleteShared=$DELETE_SHARED"
 
 az account set --subscription $SUBSCRIPTION_ID
 
@@ -61,7 +69,17 @@ if [[ "$PURGE_VAULT" == "1" ]]; then
   done
   step "Purging soft-deleted Key Vault $VAULT_NAME..."
   az keyvault purge --name "$VAULT_NAME"
-  success "Teardown complete (resource group deleted, vault purged)."
+  info "Environment resource group deleted, vault purged."
 else
   info "Skipping Key Vault purge (pass --purge-vault to purge $VAULT_NAME for same-name redeploy)."
+fi
+
+# Shared RG last (only with --shared): the env RG is deleted first so no
+# running container app can lose its image pull mid-teardown.
+if [[ "$DELETE_SHARED" == "1" ]]; then
+  step "Deleting shared resource group $SHARED_RG_NAME..."
+  az group delete --name "$SHARED_RG_NAME" --yes --no-wait
+  success "Teardown complete (environment and shared resource groups deleting)."
+else
+  info "Shared resource group $SHARED_RG_NAME kept (pass --shared to delete it too)."
 fi
