@@ -1,28 +1,16 @@
-import { ResourceGroupInputs } from './_types.bicep'
-
-param inputs ResourceGroupInputs
-param identityPrincipalId string
+param location string
+param registryName string
+param tags object
 
 resource acr 'Microsoft.ContainerRegistry/registries@2025-11-01' = {
-  name: toLower(replace('acr${inputs.global.baseName}${inputs.global.environment}', '-', ''))
-  location: inputs.global.location
-  tags: inputs.tags
+  name: registryName
+  location: location
+  tags: tags
   sku: {
     name: 'Basic'
   }
   properties: {
     adminUserEnabled: false
-  }
-}
-
-var acrPullRoleId = '7f951dda-4ed3-4680-a7ca-43fe172d538d' // AcrPull
-resource acrPull 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(acr.id, identityPrincipalId, acrPullRoleId)
-  scope: acr
-  properties: {
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', acrPullRoleId)
-    principalId: identityPrincipalId
-    principalType: 'ServicePrincipal'
   }
 }
 

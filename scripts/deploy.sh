@@ -12,11 +12,27 @@ if [[ "$ACTION" != "create" && "$ACTION" != "what-if" ]]; then
   exit 1
 fi
 
-registry_name() { echo "acr${BASE_NAME}${ENVIRONMENT}" | tr '[:upper:]' '[:lower:]' | tr -d '-'; }
-login_server() { echo "$(registry_name).azurecr.io"; }
-
 # Set the subscription context for Azure CLI commands
 az account set --subscription $SUBSCRIPTION_ID
+
+# The ACR lives in the shared resource group and must exist before the env
+# deployment: main.bicep declares it as `existing`, so a missing registry fails
+# the Bicep deployment partway through (after the env RG is created). Fail fast
+# with the fix instead.
+step "Checking shared resource group $SHARED_RG_NAME (ACR)..."
+if ! az group show --name "$SHARED_RG_NAME" >/dev/null 2>&1; then
+  error "Shared resource group $SHARED_RG_NAME not found; the shared ACR does not exist."
+  error "Deploy it first:"
+  error "  ./scripts/deploy-shared.sh create"
+  exit 1
+fi
+if ! az acr show -n "$(registry_name)" >/dev/null 2>&1; then
+  error "Shared ACR $(registry_name) not found in $SHARED_RG_NAME."
+  error "Redeploy it with:"
+  error "  ./scripts/deploy-shared.sh create"
+  exit 1
+fi
+success "Shared registry $(registry_name) found."
 
 # Guard against redeploying while a previous teardown is still draining.
 # `teardown.sh` deletes the RG with --no-wait and the managed environment
@@ -37,21 +53,15 @@ else
 fi
 
 step "Checking if image exists in ACR..."
-# Tolerate missing registry/repo on first deploy: `az acr show` and
-# `show-tags` return non-zero when the RG/ACR does not exist yet or the
-# repo/tag was never pushed. Both are expected pre-first-deploy, so fall
-# back to the helloworld image instead of failing (set -e does not trigger
-# inside `if`, but the nesting below makes the intent explicit).
-if az acr show -n "$(registry_name)" 2>/dev/null 1>&2; then
-  if az acr repository show-tags -n "$(registry_name)" --repository api 2>/dev/null | grep -q "$ENVIRONMENT"; then
-    success "Image api:$ENVIRONMENT exists in ACR, using it for deployment."
-    export IMAGE="$(login_server)/api:$ENVIRONMENT"
-  else
-    warn "ACR exists but api:$ENVIRONMENT tag not found, using default image for deployment."
-    export IMAGE="mcr.microsoft.com/azuredocs/containerapps-helloworld:latest"
-  fi
+# The shared registry is guaranteed to exist by the check above; only the
+# `api:<env>` tag can be missing (first deploy, or after a `--shared`
+# teardown). Fall back to the helloworld image in that case — the real image is
+# pushed by `az acr build` below (set -e does not trigger inside `if`).
+if az acr repository show-tags -n "$(registry_name)" --repository api 2>/dev/null | grep -q "$ENVIRONMENT"; then
+  success "Image api:$ENVIRONMENT exists in ACR, using it for deployment."
+  export IMAGE="$(login_server)/api:$ENVIRONMENT"
 else
-  warn "ACR $(registry_name) not found (expected on first deploy), using default image for deployment."
+  warn "api:$ENVIRONMENT tag not found in $(registry_name), using default image for deployment."
   export IMAGE="mcr.microsoft.com/azuredocs/containerapps-helloworld:latest"
 fi
 
@@ -61,6 +71,7 @@ log_vars \
   "Subscription=$SUBSCRIPTION_ID" \
   "Resource group=$RG_NAME" \
   "RG state=${RG_STATE:-absent}" \
+  "Shared resource group=$SHARED_RG_NAME" \
   "Location=$LOCATION" \
   "Deployment=$DEPLOYMENT_NAME" \
   "ImageTag=$IMAGE_TAG"
