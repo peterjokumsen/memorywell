@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Phase 1 — teardown. Destroys everything between study sessions.
-# Cost control depends on this. See docs/phase-1-brief.md §4 step 6.
+# Cost control depends on this. See docs/phase-1/step-6.md.
 set -euo pipefail
 
 # prepare environment variables
