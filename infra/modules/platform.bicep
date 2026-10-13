@@ -24,6 +24,13 @@ module keyVault 'vault.bicep' = {
   }
 }
 
+module cosmos 'cosmos.bicep' = {
+  name: '${deployment().name}-cosmos'
+  params: {
+    inputs: inputs
+  }
+}
+
 module containerApp 'containerapp.bicep' = {
   name: '${deployment().name}-containerapp'
   params: {

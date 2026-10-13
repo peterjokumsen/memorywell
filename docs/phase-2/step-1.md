@@ -37,5 +37,8 @@ vector path `memories.embedding` and Postgres `embedding vector(<dims>)`
 
 ## Verify
 
-- [ ] Portal/CLI shows Cosmos serverless account + 9 containers; `memories`
+- [x] Portal/CLI shows Cosmos serverless account + 9 containers; `memories`
       has the vector index; consistency is `Session`.
+- [x] Account is tagged with the env tags (same pattern as `vault.bicep`), and
+      the module exports `accountName` / `accountEndpoint` / `databaseName` for
+      step-4 wiring.

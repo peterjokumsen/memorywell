@@ -18,7 +18,8 @@ Deploys, each as its own group (one step per group, no mixing):
 - **Group A — Cosmos DB for NoSQL**: account, database, containers.
 - **Group B — PostgreSQL Flexible Server**: server, database, pgvector.
 - **Group C — Redis**: cache instance.
-- **Group D — Secrets wiring**: connection strings / keys into Key Vault.
+- **Group D — Identity and secrets wiring**: Cosmos keyless (managed identity +
+  RBAC, no secret), Postgres/Redis connection strings into Key Vault.
 - **Group E — Seed script**: one household of sample data carrying every
   domain-invariant field.
 
