@@ -7,6 +7,9 @@ param acrLoginServer string
 param identityId string
 param identityPrincipalId string
 param keyVaultName string
+@secure()
+param postgresAdministrationPassword string
+param postgresClientIp string
 
 module monitoring 'monitor.bicep' = {
   name: '${deployment().name}-monitoring'
@@ -30,6 +33,18 @@ module cosmos 'cosmos.bicep' = {
     inputs: inputs
   }
 }
+
+module postgres 'postgres.bicep' = {
+  name: '${deployment().name}-postgres'
+  params: {
+    inputs: inputs
+    administratorPassword: postgresAdministrationPassword
+    adminstratorLogin: 'memwelladmin'
+    clientIpAddress: postgresClientIp
+  }
+}
+
+output postgresServerName string = postgres.outputs.serverName
 
 module containerApp 'containerapp.bicep' = {
   name: '${deployment().name}-containerapp'

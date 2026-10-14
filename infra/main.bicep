@@ -11,6 +11,9 @@ param containerImage string
 param sharedResourceGroupName string
 param acrName string
 param keyVaultName string
+@secure()
+param postgresAdministratorPassword string
+param postgresClientIp string
 
 var globalInputs GlobalInputs = {
   location: location
@@ -78,6 +81,8 @@ module platform './modules/platform.bicep' = {
     identityId: identity.outputs.id
     identityPrincipalId: identity.outputs.principalId
     keyVaultName: keyVaultName
+    postgresAdministrationPassword: postgresAdministratorPassword
+    postgresClientIp: postgresClientIp
   }
   // No output links platform to acrPull, so order it explicitly: the app must
   // not start pulling before the role assignment exists.

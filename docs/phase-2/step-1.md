@@ -30,8 +30,7 @@ resource account 'Microsoft.DocumentDB/databaseAccounts@2024-05-15' = {
 }
 ```
 
-Vector dimensions (record your choice here when you build): suggested
-`1536` (`text-embedding-3-small`, used by Curator in Phase 4b). Cosmos
+Vector dimensions: `1536` (`text-embedding-3-small`, used by Curator in Phase 4b). Cosmos
 vector path `memories.embedding` and Postgres `embedding vector(<dims>)`
 ([step-2.md](./step-2.md)) must use the same number.
 

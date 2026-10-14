@@ -7,3 +7,5 @@ param containerImage = readEnvironmentVariable('IMAGE', 'mcr.microsoft.com/azure
 param sharedResourceGroupName = readEnvironmentVariable('SHARED_RG_NAME', '')
 param acrName = readEnvironmentVariable('SHARED_ACR_NAME', '')
 param keyVaultName = readEnvironmentVariable('VAULT_NAME', '')
+param postgresAdministratorPassword = readEnvironmentVariable('POSTGRES_ADMIN_PASSWORD', '')
+param postgresClientIp = readEnvironmentVariable('CLIENT_IP', '')
