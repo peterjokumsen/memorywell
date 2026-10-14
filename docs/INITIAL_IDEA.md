@@ -3,6 +3,7 @@ Here is a breakdown of how to approach this from a product and feature perspecti
 
 1. The Core Concept: "The Circle of Care"
    Instead of just a "User and Profile" model, think of it as a "Chronicle" (the child's record) and a "Contributors" (the relatives).
+
    - The Owner (Parent): Curates the timeline, manages permissions, and sets the "tone" of the record.
    - The Contributors (Grandparents, Aunts, Uncles): Receive specific invites to add "Moments."
    - The Recipient (The Child): The eventual "Read-Only" owner who unlocks the full archive on a specific milestone (e.g., 18th birthday).
@@ -10,6 +11,7 @@ Here is a breakdown of how to approach this from a product and feature perspecti
 2. Feature Set & User Experience
    A. The Invitation System (The "Extender")
    To make it easy for non-tech-savvy relatives, the invite process must be frictionless.
+
    - Magic Links: Parents generate a unique link (sent via WhatsApp/iMessage). The relative clicks it and is immediately taken to a "Drop Zone" without needing to create a full, complex account (or using a very lightweight social login).
    - Role-Based Permissions:
    - Full Contributor: Can upload text, photos, and voice notes.

@@ -185,7 +185,9 @@ slow — recreate it with `./scripts/deploy-shared.sh`.
    The log should print `rg-memwell-dev`, `kv-memwell-dev` and the shared
    decision, and touch nothing in Azure.
 2. Run again with `dry_run: false`. Expect the RG delete, the vault purge
-   (~1–5 min of waiting), and a green **Verify** step.
+   (waiting; the **Verify** step allows up to 30 min for the managed
+   environment to drain, logging progress every few checks), and a green
+   **Verify** step.
 3. Confirm in the portal that `rg-memwell-dev` is gone and
    `rg-memwell-shared` still exists.
 4. Confirm the next `./scripts/deploy.sh` succeeds — that is the real proof the

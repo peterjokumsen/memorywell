@@ -41,7 +41,7 @@ jobs:
     name: Teardown ${{ inputs.environment || 'dev' }}
     runs-on: ubuntu-latest
     environment: azure # holds the OIDC federated credential; see docs/CI_TEARDOWN.md
-    timeout-minutes: 20
+    timeout-minutes: 45
 
     steps:
       - name: Check out repo
@@ -141,24 +141,44 @@ jobs:
           BASE_NAME: ${{ steps.config.outputs.base_name }}
           ENVIRONMENT: ${{ steps.config.outputs.environment }}
           VAULT_NAME: ${{ steps.config.outputs.vault_name }}
+          # The RG delete is async (teardown.sh uses --no-wait). Draining the
+          # managed environment alone routinely takes >5 min, so allow 30.
+          RG_WAIT_TIMEOUT_MINUTES: "30"
+          RG_POLL_SECONDS: "20"
         run: |
           set -euo pipefail
           rg_name="rg-$BASE_NAME-$ENVIRONMENT"
           status=0
 
-          # The RG delete is async (teardown.sh uses --no-wait), so give it a
-          # few minutes before declaring failure.
-          for attempt in $(seq 1 30); do
+          timeout_min="${RG_WAIT_TIMEOUT_MINUTES:-30}"
+          poll_seconds="${RG_POLL_SECONDS:-20}"
+          max_attempts=$((timeout_min * 60 / poll_seconds))
+          max_attempts=$((max_attempts < 1 ? 1 : max_attempts))
+          echo "Waiting up to ${timeout_min} min (${max_attempts} checks, one every ${poll_seconds}s) for resource group $rg_name to disappear..."
+
+          gone=0
+          for attempt in $(seq 1 "$max_attempts"); do
             if ! az group show --name "$rg_name" >/dev/null 2>&1; then
-              echo "Resource group $rg_name is gone."
+              echo "Check $attempt/$max_attempts: resource group $rg_name is gone."
+              gone=1
               break
             fi
-            if [[ "$attempt" == "30" ]]; then
-              echo "::error::Resource group $rg_name still exists after 5 min."
-              status=1
+            remaining=$(((max_attempts - attempt) * poll_seconds / 60))
+            if (( attempt % 5 == 0 || attempt == 1 )); then
+              echo "Check $attempt/$max_attempts: $rg_name still exists (~${remaining} min left in budget)."
             fi
-            sleep 10
+            if (( attempt == max_attempts )); then
+              echo "::error::Resource group $rg_name still exists after ${timeout_min} min."
+              status=1
+              break
+            fi
+            sleep "$poll_seconds"
           done
+
+          if (( gone == 0 && status == 0 )); then
+            echo "::error::Resource group $rg_name check loop exited unexpectedly."
+            status=1
+          fi
 
           # An un-purged soft-deleted vault blocks the next same-name deploy,
           # so a leftover one fails the run loudly.
