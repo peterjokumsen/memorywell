@@ -39,7 +39,7 @@ module postgres 'postgres.bicep' = {
   params: {
     inputs: inputs
     administratorPassword: postgresAdministrationPassword
-    adminstratorLogin: 'memwelladmin'
+    administratorLogin: 'memwelladmin'
     clientIpAddress: postgresClientIp
   }
 }

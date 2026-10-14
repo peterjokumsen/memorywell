@@ -1,22 +1,23 @@
 import { ResourceGroupInputs } from './_types.bicep'
 
 param inputs ResourceGroupInputs
-param adminstratorLogin string
+param administratorLogin string
 param clientIpAddress string
 @secure()
 param administratorPassword string
 
+// Flexible Server built-in pooler on PG14+, small max_connections on a 2-vCPU B1ms, Phase 3 opening one pool per agent container
 resource server 'Microsoft.DBforPostgreSQL/flexibleServers@2025-08-01' = {
   name: 'pg-${inputs.global.baseName}-${inputs.global.environment}'
   location: inputs.global.location
   tags: inputs.tags
   sku: {
-    name: 'B1ms'
+    name: 'Standard_B1ms'
     tier: 'Burstable'
   }
   properties: {
     version: '16'
-    administratorLogin: adminstratorLogin
+    administratorLogin: administratorLogin
     administratorLoginPassword: administratorPassword
     storage: {
       storageSizeGB: 32

@@ -15,17 +15,19 @@ Cosmos, no Redis.
 
 ## Progress snapshot (2026-10-14)
 
-Status: **implemented by hand, not yet deployed, not yet verified.** Committed
-as WIP. `rg-memwell-dev` was torn down after step 1, so nothing of this step
-exists in Azure yet and both Verify boxes below stay unchecked.
+Status: **deployed and verified (2026-10-14).** Live as `pg-memwell-dev` in
+`rg-memwell-dev`; reachable, `azure.extensions` allowlists `vector`, and
+`memorywell` exists. The `documents` table is still expected to be absent —
+step 5's seed owns schema creation.
 
 ### What is in place
 
 - `infra/modules/postgres.bicep` (new): Flexible Server `pg-<base>-<env>`,
-  `B1ms`/Burstable, `version: '16'`, 32 GiB storage, `highAvailability.mode:
-'Disabled'`, 7-day backup, `publicNetworkAccess: 'Enabled'`; child resources
-  for the `memorywell` database, the `azure.extensions = 'vector'` allowlist,
-  and an `allow-client` firewall rule built from `CLIENT_IP`.
+  `Standard_B1ms`/Burstable, `version: '16'`, 32 GiB storage,
+  `highAvailability.mode: 'Disabled'`, 7-day backup,
+  `publicNetworkAccess: 'Enabled'`; child resources for the `memorywell`
+  database, the `azure.extensions = 'vector'` allowlist, and an
+  `allow-client` firewall rule built from the client IP.
 - Param threading: `@secure()` `postgresAdministratorPassword` +
   `postgresClientIp` declared on `main.bicep`, forwarded through
   `platform.bicep` into the module; both sourced in `main.bicepparam` via
@@ -49,40 +51,51 @@ so these fail at ARM time rather than build time:
 `authConfig` (for Entra-only admin, still open) uses
 `activeDirectoryAuth`, not `entraAuth`.
 
-### Open before the first deploy
+### Resolved during the deploy
 
-1. **`CLIENT_ID` vs `CLIENT_IP` mismatch — blocker.**
-   `scripts/common.sh` exports `CLIENT_ID="$(curl -s https://api.ipify.org)"`,
-   but `main.bicepparam` reads `CLIENT_IP`. The firewall rule would get an
-   empty string and the deployment fails validation. `CLIENT_ID` is also a
-   loaded name — it is the usual variable for an Entra service principal's
-   client id, so it should not carry a home IP address. Rename the export to
-   `CLIENT_IP`.
-2. **Comment still owed.** The brief asks for the pooling story in a comment
-   (Flexible Server built-in pooler on PG14+; `max_connections` is small on a
-   2-vCPU B1ms and Phase 3 opens one pool per agent container). Not written.
-3. **Cost guards to keep:** `highAvailability.mode: 'Disabled'` (the ARM
+1. **`CLIENT_ID` vs `CLIENT_IP` mismatch — closed.** The blocker was that
+   `scripts/common.sh` exported the ipify result as `CLIENT_ID` while
+   `main.bicepparam` read `CLIENT_IP`, so the firewall rule got an empty
+   string. Fixed by renaming the export to `CLIENT_IP`, which is also the
+   honest name for it — `CLIENT_ID` is the usual variable for an Entra
+   service principal's client id and should not be carrying a home IP.
+2. **`adminstratorLogin` typo — fixed** (`administratorLogin` in both
+   `postgres.bicep` and the `platform.bicep` call site).
+3. **SKU name — fixed to `Standard_B1ms`.** The short `B1ms` is what the
+   docs/portal show, but the ARM API wants the full name.
+4. **Pooling comment — written**, on the `server` resource in `postgres.bicep`.
+5. **Cost guards to keep:** `highAvailability.mode: 'Disabled'` (the ARM
    default is ZoneRedundant — 2× cost, needs zones) and
    `storage.autoGrow: 'Disabled'` (a runaway vector table would otherwise
-   resize the server silently). Both are already set.
-4. **Cosmetic:** the module param is spelled `adminstratorLogin` (missing `i`).
-   Consistent across `postgres.bicep` and the call site, so it compiles.
+   resize the server silently). Both confirmed live.
 
 ### Verify
 
-- [ ] `./scripts/deploy.sh what-if` shows the Flexible Server, database,
-      `azure.extensions` and firewall rule, and no change to Cosmos.
-- [ ] `./scripts/deploy.sh create` succeeds. Expect ~5–10 min of silence while
-      B1ms provisions — `deploy.sh` prints nothing between the ARM call and the
-      health check.
-- [ ] `az postgres flexible-server show -g rg-memwell-dev -n pg-memwell-dev -o table`
-      reports `B1ms` / Burstable, HA `Disabled`, `publicNetworkAccess Enabled`.
+- [x] `./scripts/deploy.sh what-if` shows the Flexible Server, database,
+      `azure.extensions` and firewall rule. Live state matches the template:
+      both child resources report **no change**, and the server-level diffs
+      are ARM echoing defaults back (`authConfig.activeDirectoryAuth
+"Disabled"`, `dataEncryption.type "SystemManaged"`,
+      `storage.iops 120` / `tier P4` / `type Premium_LRS`) — no-ops.
+- [x] `./scripts/deploy.sh create` succeeds.
+- [x] `az postgres flexible-server show -g rg-memwell-dev -n pg-memwell-dev`
+      → `Standard_B1ms` / `Burstable`, `highAvailability.mode "Disabled"`,
+      `state: Ready`, `publicNetworkAccess "Enabled"`, `version 16` (minor 15),
+      FQDN `pg-memwell-dev.postgres.database.azure.com`.
+- [x] Firewall rule `allow-client` = `45.222.74.0`/`45.222.74.0`, matching
+      `curl https://api.ipify.org` at deploy time. A successful `psycopg`
+      connection from this machine confirms it end to end.
+- [x] `SHOW azure.extensions` returns `vector` (via
+      `az postgres flexible-server parameter show --name azure.extensions`,
+      `source: user-override`).
 - [ ] `SELECT * FROM pg_extension WHERE extname='vector'` returns a row — but
       only _after_ step 5 runs `CREATE EXTENSION`. Bicep only allowlists the
-      extension; it never installs it. Before the seed, check the allowlist
-      instead: `SHOW azure.extensions` should list `vector`.
+      extension; it never installs it. Currently empty, as expected. Before
+      the seed, check the allowlist instead: `SHOW azure.extensions` should
+      list `vector`.
 - [ ] `documents` table exists after the seed runs
-      ([step-5.md](./step-5.md)).
+      ([step-5.md](./step-5.md)). `pg_tables WHERE schemaname='public'` is
+      currently empty.
 
 ### Notes
 
@@ -97,3 +110,19 @@ so these fail at ARM time rather than build time:
   firewall. Both were unconfirmed; switching to Entra-only later means adding
   `flexibleServers/administrators` + `authConfig.activeDirectoryAuth`, and a
   token exchange in the seed script.
+- `POSTGRES_ADMIN_PASSWORD` is now locked in. It is a create-only property:
+  changing it in `.env` and redeploying fails on an existing server. Rotate
+  with `az postgres flexible-server admin update`, not a redeploy.
+- Live `max_connections` is `50` (B1ms, 2 vCPU). Phase 3 must budget it across
+  the three agents, and the Flexible Server pooler wants its own
+  `pooler.postgres.database.azure.com` FQDN — noted in the `postgres.bicep`
+  comment.
+- `az postgres flexible-server config` no longer exists in azure-cli 2.91; the
+  command is `az postgres flexible-server parameter`.
+- what-if reports `properties.charset: "UTF8" => "utf8"` on the database. Pure
+  casing noise — ARM echoes the value back uppercase — but it means that line
+  will never reach "no change".
+- Pre-existing from Phase 1, unrelated to this step: what-if flags
+  `enableAutomaticFailover: true => false` on the Cosmos account and 9 Cosmos
+  containers as "to modify". Those are ARM defaults being re-stated, but worth
+  a look before the Phase 2 review gate.
