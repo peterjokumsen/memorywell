@@ -1,0 +1,146 @@
+name: ci
+
+# Gate for merging into main: everything here must pass on the PR head.
+# Mirrors .pre-commit-config.yaml plus the real test/lint/build steps that
+# pre-commit cannot run (pytest needs the api/ dependency set, bicep needs the
+# compiler). Deploys are separate — see teardown.yml and docs/CI_TEARDOWN.md.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# A new push to the same PR supersedes the previous run.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Lint & formatting (pre-commit)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version-file: .python-version
+
+      - name: Cache pre-commit environments
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pre-commit
+          key: pre-commit-${{ hashFiles('.pre-commit-config.yaml') }}
+
+      # --all-files is the deliberate CI baseline; locally the hooks run on
+      # staged files only (see AGENTS.md).
+      - name: Run pre-commit on all files
+        uses: pre-commit/action@v3.0.1
+
+  test:
+    name: Tests (api)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version-file: .python-version
+          cache: pip
+          cache-dependency-path: api/requirements.txt
+
+      - name: Install dependencies
+        working-directory: api
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      # Tests import `main` via a sys.path insert, so pytest runs from api/.
+      # Add functions/ later as its own job once it exists.
+      - name: Run pytest
+        working-directory: api
+        run: pytest -q
+
+  infra:
+    name: IaC build (bicep)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v7
+
+      # Ships the `az bicep` extension; the bicep compiler itself is
+      # installed automatically on first use by the extension.
+      - name: Install Azure CLI (provides az bicep)
+        uses: azure/CLI@v2
+
+      - name: Build every bicep file
+        run: |
+          set -euo pipefail
+          status=0
+          while IFS= read -r file; do
+            echo "::group::az bicep build $file"
+            if az bicep build --file "$file" --stdout >/dev/null; then
+              echo "ok"
+            else
+              echo "::error::bicep build failed for $file"
+              status=1
+            fi
+            echo "::endgroup::"
+          done < <(find infra -name '*.bicep' | sort)
+          exit "$status"
+
+      # Matches the bicep-format local hook in .pre-commit-config.yaml: Space
+      # indent, size 2, final newline. Formats a copy of the whole tree so
+      # module paths still resolve, then diffs, so a failure shows the exact
+      # change instead of silently rewriting the repo.
+      - name: Check bicep formatting
+        run: |
+          set -euo pipefail
+          tmp="$(mktemp -d)"
+          cp -r infra "$tmp/infra"
+          while IFS= read -r file; do
+            az bicep format \
+              --indent-kind Space --indent-size 2 --insert-final-newline \
+              --file "$file"
+          done < <(find "$tmp/infra" -name '*.bicep' | sort)
+          diff -ru infra "$tmp/infra"
+
+  shell:
+    name: Shell scripts
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v7
+
+      # Syntax errors in a script only surface at run time, so fail on those.
+      - name: bash -n
+        run: |
+          set -euo pipefail
+          while IFS= read -r file; do
+            echo "::group::bash -n $file"
+            bash -n "$file"
+            echo "::endgroup::"
+          done < <(find scripts -name '*.sh' | sort)
+
+      # Informational for now: scripts/ already carries SC2155 (export X="$(...)")
+      # and common.sh is sourced, so SC2148 has no shebang to find. Drop
+      # continue-on-error once those are cleaned up to make shellcheck a gate.
+      - name: shellcheck
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          shellcheck --severity=warning --exclude=SC2148 scripts/*.sh
