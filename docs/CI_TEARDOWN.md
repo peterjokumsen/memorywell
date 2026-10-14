@@ -22,7 +22,7 @@ repository.
 ### 1.1 Create the app registration
 
 ```bash
-APP_ID=$(az ad sp create-for-rbac-query \
+APP_ID=$(az ad sp create-for-rbac \
   --name sp-memorywell-teardown \
   --query appId -o tsv)
 TENANT_ID=$(az ad sp show --id "$APP_ID" --query tenantId -o tsv)
@@ -30,7 +30,7 @@ echo "client_id=$APP_ID"
 echo "tenant_id=$TENANT_ID"
 ```
 
-`create-for-rbac-query` does not create a password. Copy `client_id` and
+`create-for-rbac` does not create a password. Copy `client_id` and
 `tenant_id` — both are needed below.
 
 ### 1.2 Role assignments
@@ -63,8 +63,8 @@ az role assignment create \
 Verify (RBAC propagation can take up to ~5 minutes):
 
 ```bash
-az role assignment list --assignee "$APP_ID" --all \
-  --query '[].{role:roleName, scope:scope}' -o table
+az role assignment list --assignee-object-id "$APP_ID" --all \
+  --query '[].{role:roleDefinitionName, scope:scope}' -o table
 ```
 
 If `az keyvault purge` is refused with an authorization error, add **Owner** at
@@ -74,10 +74,6 @@ the deleted resource, and some subscriptions block it for Contributor.
 ### 1.3 Federated credential
 
 ```bash
-az ad app federated-credential create \
-  --parameters "federatedIdentityCredential=@cred.json" \
-  --id "$APP_ID"
-
 # with cred.json:
 {
   "name": "memorywell-teardown-main",
@@ -85,6 +81,10 @@ az ad app federated-credential create \
   "subject": "repo:<your-github-user>/memorywell:environment:azure",
   "audiences": ["api://AzureADTokenExchange"]
 }
+
+az ad app federated-credential create \
+  --parameters cred.json \
+  --id "$APP_ID"
 ```
 
 The `subject` **must** match the GitHub environment name in
@@ -116,15 +116,14 @@ Add **variables** (Settings → Secrets and variables → Actions → Variables 
 
 `SHARED_LOCK` controls what happens to `rg-<base>-shared` (the ACR):
 
-| `SHARED_LOCK`               | Scheduled nightly run | Manual run with `delete_shared: false` |
-| --------------------------- | --------------------- | -------------------------------------- |
-| `true` (default)            | kept                  | kept                                   |
-| anything else               | deleted               | kept                                   |
-| any + `delete_shared: true` | —                     | deleted                                |
+| `SHARED_LOCK`                   | Scheduled nightly run | Manual run with `delete_shared: false` |
+| ------------------------------- | --------------------- | -------------------------------------- |
+| `true`                          | kept                  | kept                                   |
+| anything else (default:`false`) | deleted               | kept                                   |
+| any + `delete_shared: true`     | —                     | deleted                                |
 
-Keep it `true` normally: deleting the shared RG forces a full ACR recreate on the
-next deploy. Set it to `false` when you want the nightlies to clean up everything
-too.
+Since ACR has a cost, for now keeping this at `false` as environment variable.
+When shared RG is needed for environments other than `dev`, should switch this to `true`.
 
 Note that `az login`/RBAC aside, the ACR deletion is what makes the next deploy
 slow — recreate it with `./scripts/deploy-shared.sh`.
