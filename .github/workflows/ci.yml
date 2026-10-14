@@ -94,9 +94,13 @@ jobs:
         run: |
           set -euo pipefail
           echo "Using bicep $BICEP_VERSION"
-          curl -fsSL -o /usr/local/bin/bicep \
+          # Into ~/.local/bin, not /usr/local/bin: the runner user cannot
+          # write there.
+          mkdir -p ~/.local/bin
+          curl -fsSL -o ~/.local/bin/bicep \
             "https://github.com/Azure/bicep/releases/download/$BICEP_VERSION/bicep-linux-x64"
-          chmod +x /usr/local/bin/bicep
+          chmod +x ~/.local/bin/bicep
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
           bicep --version
 
       - name: Build every bicep file
