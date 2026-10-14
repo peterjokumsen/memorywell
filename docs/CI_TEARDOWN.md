@@ -100,17 +100,22 @@ Add a **secret**:
 | Name                    | Value                                  |
 | ----------------------- | -------------------------------------- |
 | `AZURE_SUBSCRIPTION_ID` | Subscription containing `rg-memwell-*` |
+| `AZURE_CLIENT_ID`       | app id from 1.1                        |
+| `AZURE_TENANT_ID`       | tenant id from 1.1                     |
+
+All three must be **secrets**, not variables — the workflow reads them via
+`${{ secrets.* }}`. Stored as variables the OIDC login step gets empty values
+and fails with `Not all values are present. Ensure 'client-id' and 'tenant-id'
+are supplied`.
 
 Add **variables** (Settings → Secrets and variables → Actions → Variables tab):
 
-| Name              | Value              | Notes                    |
-| ----------------- | ------------------ | ------------------------ |
-| `AZURE_CLIENT_ID` | app id from 1.1    |                          |
-| `AZURE_TENANT_ID` | tenant id from 1.1 |                          |
-| `BASE_NAME`       | `memwell`          | must match your `.env`   |
-| `LOCATION`        | `westeurope`       | must match your `.env`   |
-| `SHARED_LOCK`     | `true`             | see below                |
-| `ENVIRONMENT`     | `dev`              | fallback for manual runs |
+| Name          | Value        | Notes                    |
+| ------------- | ------------ | ------------------------ |
+| `BASE_NAME`   | `memwell`    | must match your `.env`   |
+| `LOCATION`    | `westeurope` | must match your `.env`   |
+| `SHARED_LOCK` | `true`       | see below                |
+| `ENVIRONMENT` | `dev`        | fallback for manual runs |
 
 ### Shared RG lock
 
