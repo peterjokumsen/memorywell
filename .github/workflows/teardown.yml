@@ -1,0 +1,170 @@
+name: scheduled-teardown
+
+# Cost control: the dev environment (Cosmos, Postgres, Redis, Container Apps,
+# Functions) costs money while it runs, so it is destroyed nightly and rebuilt
+# on demand. Setup for the Azure app registration, RBAC and GitHub secrets is
+# documented in docs/CI_TEARDOWN.md.
+on:
+  schedule:
+    # Nightly at 02:00 UTC. GitHub disables scheduled workflows on repos with
+    # no activity for 60 days, so check the Actions tab after long breaks.
+    - cron: "0 2 * * *"
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Environment suffix to tear down (rg-<base>-<environment>)
+        required: false
+        default: dev
+      delete_shared:
+        description: Also delete the shared resource group (ACR)
+        required: false
+        default: false
+        type: boolean
+      dry_run:
+        description: Show what would be deleted, change nothing in Azure
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  id-token: write # OIDC token for azure/login (no stored client secret)
+  contents: read
+
+concurrency:
+  # Never let two teardowns race: the second would see a "deleting" RG and
+  # fail, and could purge a vault the first run already handled.
+  group: teardown-${{ inputs.environment || 'dev' }}
+  cancel-in-progress: false
+
+jobs:
+  teardown:
+    name: Teardown ${{ inputs.environment || 'dev' }}
+    runs-on: ubuntu-latest
+    environment: azure # holds the OIDC federated credential; see docs/CI_TEARDOWN.md
+    timeout-minutes: 20
+
+    steps:
+      - name: Resolve config
+        id: config
+        env:
+          INPUT_ENVIRONMENT: ${{ inputs.environment }}
+          INPUT_DELETE_SHARED: ${{ inputs.delete_shared }}
+          INPUT_DRY_RUN: ${{ inputs.dry_run }}
+          VAR_BASE_NAME: ${{ vars.BASE_NAME }}
+          VAR_LOCATION: ${{ vars.LOCATION }}
+          VAR_ENVIRONMENT: ${{ vars.ENVIRONMENT }}
+          VAR_SHARED_LOCK: ${{ vars.SHARED_LOCK }}
+        run: |
+          set -euo pipefail
+
+          # scripts/common.sh derives rg-<base>-<env> and the vault name from
+          # BASE_NAME / ENVIRONMENT and then runs `az account set --subscription
+          # $SUBSCRIPTION_ID`; it reads .env, which is git-ignored, so the values
+          # are injected into the environment instead.
+          base_name="${VAR_BASE_NAME:-memwell}"
+          location="${VAR_LOCATION:-westeurope}"
+          environment="${INPUT_ENVIRONMENT:-${VAR_ENVIRONMENT:-dev}}"
+
+          {
+            echo "BASE_NAME=$base_name"
+            echo "LOCATION=$location"
+            echo "ENVIRONMENT=$environment"
+            echo "SUBSCRIPTION_ID=${{ secrets.AZURE_SUBSCRIPTION_ID }}"
+          } >> "$GITHUB_ENV"
+
+          echo "base_name=$base_name" >> "$GITHUB_OUTPUT"
+          echo "environment=$environment" >> "$GITHUB_OUTPUT"
+          echo "vault_name=kv-$base_name-$environment" >> "$GITHUB_OUTPUT"
+
+          # The shared RG (ACR) survives teardown by default: it is
+          # subscription-scoped and expensive to recreate. Delete it only when a
+          # manual run asks for it or SHARED_LOCK is not "true".
+          # Inputs are empty strings on the schedule trigger, not "false".
+          delete_shared_requested="${INPUT_DELETE_SHARED:-false}"
+          dry_run_requested="${INPUT_DRY_RUN:-false}"
+
+          shared_lock="${VAR_SHARED_LOCK:-true}"
+          if [[ "$delete_shared_requested" == "true" ]]; then
+            echo "delete_shared=1" >> "$GITHUB_OUTPUT"
+            echo "SHARED_LOCK is '$shared_lock' but delete_shared was requested."
+          elif [[ "$shared_lock" == "true" ]]; then
+            echo "delete_shared=0" >> "$GITHUB_OUTPUT"
+            echo "SHARED_LOCK=true; keeping the shared resource group."
+          else
+            echo "delete_shared=1" >> "$GITHUB_OUTPUT"
+            echo "SHARED_LOCK=$shared_lock; shared resource group will be deleted too."
+          fi
+
+          if [[ "$dry_run_requested" == "true" ]]; then
+            echo "dry_run=1" >> "$GITHUB_OUTPUT"
+          else
+            echo "dry_run=0" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Log in to Azure (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Teardown
+        if: steps.config.outputs.dry_run == '0'
+        env:
+          DELETE_SHARED: ${{ steps.config.outputs.delete_shared }}
+        run: |
+          set -euo pipefail
+          flags=(--purge-vault)
+          if [[ "$DELETE_SHARED" == "1" ]]; then
+            flags+=(--shared)
+          fi
+          ./scripts/teardown.sh "${flags[@]}"
+
+      - name: Show what would be deleted (dry run)
+        if: steps.config.outputs.dry_run == '1'
+        env:
+          DELETE_SHARED: ${{ steps.config.outputs.delete_shared }}
+        run: |
+          set -euo pipefail
+          echo "DRY RUN — nothing below is executed."
+          echo "Resource group:      rg-${{ steps.config.outputs.base_name }}-${{ steps.config.outputs.environment }}"
+          echo "Key Vault purge:     ${{ steps.config.outputs.vault_name }}"
+          echo "Shared RG deletion:  $([[ "$DELETE_SHARED" == "1" ]] && echo yes || echo no)"
+          echo "Re-run without the dry_run input to apply."
+
+      - name: Verify
+        if: steps.config.outputs.dry_run == '0'
+        env:
+          BASE_NAME: ${{ steps.config.outputs.base_name }}
+          ENVIRONMENT: ${{ steps.config.outputs.environment }}
+          VAULT_NAME: ${{ steps.config.outputs.vault_name }}
+        run: |
+          set -euo pipefail
+          rg_name="rg-$BASE_NAME-$ENVIRONMENT"
+          status=0
+
+          # The RG delete is async (teardown.sh uses --no-wait), so give it a
+          # few minutes before declaring failure.
+          for attempt in $(seq 1 30); do
+            if ! az group show --name "$rg_name" >/dev/null 2>&1; then
+              echo "Resource group $rg_name is gone."
+              break
+            fi
+            if [[ "$attempt" == "30" ]]; then
+              echo "::error::Resource group $rg_name still exists after 5 min."
+              status=1
+            fi
+            sleep 10
+          done
+
+          # An un-purged soft-deleted vault blocks the next same-name deploy,
+          # so a leftover one fails the run loudly.
+          if az keyvault list-deleted --query "[?name=='$VAULT_NAME'].name" -o tsv 2>/dev/null | grep -q "$VAULT_NAME"; then
+            echo "::error::Key Vault $VAULT_NAME is still soft-deleted; purge it manually:"
+            echo "  az keyvault purge --name '$VAULT_NAME'"
+            status=1
+          else
+            echo "Key Vault $VAULT_NAME is not soft-deleted."
+          fi
+
+          exit "$status"
