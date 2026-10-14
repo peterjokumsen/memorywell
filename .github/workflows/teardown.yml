@@ -44,6 +44,9 @@ jobs:
     timeout-minutes: 20
 
     steps:
+      - name: Check out repo
+        uses: actions/checkout@v7
+
       - name: Resolve config
         id: config
         env:
