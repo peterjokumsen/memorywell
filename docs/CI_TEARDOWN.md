@@ -42,14 +42,20 @@ and `--shared` targets a different RG.
 ```bash
 SUBSCRIPTION_ID=<your subscription id>
 
+# Use the service principal's **object id**, not the app (client) id. For this
+# app they differ (appId 2c8826d7-…, objectId 281d183d-…), so assigning to
+# $APP_ID succeeds but silently binds to nothing.
+SP_OBJECT_ID=$(az ad sp show --id "$APP_ID" --query id -o tsv)
+echo "$SP_OBJECT_ID"
+
 az role assignment create \
-  --assignee-object-id "$APP_ID" \
+  --assignee-object-id "$SP_OBJECT_ID" \
   --assignee-principal-type ServicePrincipal \
   --role "Contributor" \
   --scope "/subscriptions/$SUBSCRIPTION_ID"
 
 az role assignment create \
-  --assignee-object-id "$APP_ID" \
+  --assignee-object-id "$SP_OBJECT_ID" \
   --assignee-principal-type ServicePrincipal \
   --role "Key Vault Contributor" \
   --scope "/subscriptions/$SUBSCRIPTION_ID"
@@ -60,11 +66,13 @@ az role assignment create \
 | Contributor           | `az group delete` on the env and shared RGs   |
 | Key Vault Contributor | `az keyvault purge` on the soft-deleted vault |
 
-Verify (RBAC propagation can take up to ~5 minutes):
+Verify (RBAC propagation can take up to ~5 minutes). Check `principalId` in the
+output — it must equal `$SP_OBJECT_ID`. Filtering by `--assignee` returns an empty
+list here even when the assignments exist, so scope-and-filter instead:
 
 ```bash
-az role assignment list --assignee-object-id "$APP_ID" --all \
-  --query '[].{role:roleDefinitionName, scope:scope}' -o table
+az role assignment list --scope "/subscriptions/$SUBSCRIPTION_ID" \
+  --query "[?principalId=='$SP_OBJECT_ID'].{role:roleDefinitionName, scope:scope}" -o table
 ```
 
 If `az keyvault purge` is refused with an authorization error, add **Owner** at
@@ -74,11 +82,15 @@ the deleted resource, and some subscriptions block it for Contributor.
 ### 1.3 Federated credential
 
 ```bash
+# Get the exact subject GitHub will present — do not hand-write it.
+OWNER_ID=$(gh api repos/<your-github-user>/memorywell --jq .owner.id)
+REPO_ID=$(gh api repos/<your-github-user>/memorywell --jq .id)
+
 # with cred.json:
 {
-  "name": "memorywell-teardown-main",
+  "name": "memorywell-teardown-env-azure",
   "issuer": "https://token.actions.githubusercontent.com",
-  "subject": "repo:<your-github-user>/memorywell:environment:azure",
+  "subject": "repo:<your-github-user>@$OWNER_ID/memorywell@$REPO_ID:environment:azure",
   "audiences": ["api://AzureADTokenExchange"]
 }
 
@@ -88,7 +100,27 @@ az ad app federated-credential create \
 ```
 
 The `subject` **must** match the GitHub environment name in
-[step 2](#2-github-environment-secrets-and-variables) character for character.
+[step 2](#2-github-environment-secrets-and-variables) character for character —
+and the `environment:azure` segment means the subject only works if the
+`azure` environment exists and is attached to the job.
+
+GitHub includes the **numeric owner and repo ids** in the subject
+(`repo:owner@12345/repo@67890:environment:azure`). The older id-less form
+(`repo:owner/repo:environment:azure`) is not what is presented any more, and
+login fails with:
+
+```
+AADSTS700213: No matching federated identity record found for presented
+assertion subject 'repo:...'
+```
+
+Get the ids with `gh api repos/<owner>/<repo> --jq .id` (and `.owner.id`) as
+above. If an id-less credential already exists it can be deleted:
+
+```bash
+az ad app federated-credential delete --id "$APP_ID" \
+  --parameters memorywell-teardown-main
+```
 
 ---
 
@@ -107,6 +139,18 @@ All three must be **secrets**, not variables — the workflow reads them via
 `${{ secrets.* }}`. Stored as variables the OIDC login step gets empty values
 and fails with `Not all values are present. Ensure 'client-id' and 'tenant-id'
 are supplied`.
+
+Repository-level secrets work too (an environment secret shadows a repository
+one, and `${{ secrets.* }}` falls back to repository scope), so
+`AZURE_CLIENT_ID` / `AZURE_TENANT_ID` may live under **Settings → Secrets and
+variables → Actions → Secrets** instead. `AZURE_SUBSCRIPTION_ID` is the one to
+keep on the `azure` environment, since it is subscription-specific.
+
+```bash
+# sanity check that all three resolve, after saving them
+gh secret list
+gh secret list --env azure
+```
 
 Add **variables** (Settings → Secrets and variables → Actions → Variables tab):
 
