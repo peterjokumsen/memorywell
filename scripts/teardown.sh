@@ -46,7 +46,11 @@ step "Groups in subscription $SUBSCRIPTION_ID:"
 az group list --query '[].name' -o tsv
 
 step "Deleting resource group $RG_NAME..."
-az group delete --name $RG_NAME --yes --no-wait
+if [[ "$(az group exists --name "$RG_NAME" -o tsv)" == "true" ]]; then
+  az group delete --name "$RG_NAME" --yes --no-wait
+else
+  info "Resource group $RG_NAME not found; skipping delete."
+fi
 
 # Key Vault uses soft-delete: after the RG is gone the vault lingers in
 # "deleted" state and blocks same-name redeploy. Purge is opt-in via
@@ -78,7 +82,11 @@ fi
 # running container app can lose its image pull mid-teardown.
 if [[ "$DELETE_SHARED" == "1" ]]; then
   step "Deleting shared resource group $SHARED_RG_NAME..."
-  az group delete --name "$SHARED_RG_NAME" --yes --no-wait
+  if [[ "$(az group exists --name "$SHARED_RG_NAME" -o tsv)" == "true" ]]; then
+    az group delete --name "$SHARED_RG_NAME" --yes --no-wait
+  else
+    info "Shared resource group $SHARED_RG_NAME not found; skipping delete."
+  fi
   success "Teardown complete (environment and shared resource groups deleting)."
 else
   info "Shared resource group $SHARED_RG_NAME kept (pass --shared to delete it too)."
