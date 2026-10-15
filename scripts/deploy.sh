@@ -17,20 +17,37 @@ az account set --subscription $SUBSCRIPTION_ID
 
 # The ACR lives in the shared resource group and must exist before the env
 # deployment: main.bicep declares it as `existing`, so a missing registry fails
-# the Bicep deployment partway through (after the env RG is created). Fail fast
-# with the fix instead.
+# the Bicep deployment partway through (after the env RG is created). On
+# `create`, deploy it automatically so one script call provisions everything;
+# `what-if` never creates anything, so it still fails fast with the fix.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 step "Checking shared resource group $SHARED_RG_NAME (ACR)..."
-if ! az group show --name "$SHARED_RG_NAME" >/dev/null 2>&1; then
-  error "Shared resource group $SHARED_RG_NAME not found; the shared ACR does not exist."
-  error "Deploy it first:"
-  error "  ./scripts/deploy-shared.sh create"
+if ! SHARED_RG_STATE=$(az group show --name "$SHARED_RG_NAME" --query properties.provisioningState -o tsv 2>/dev/null); then
+  if [[ "$ACTION" == "create" ]]; then
+    info "Shared resource group $SHARED_RG_NAME not found; deploying it first..."
+    "$SCRIPT_DIR/deploy-shared.sh" create
+  else
+    error "Shared resource group $SHARED_RG_NAME not found; the shared ACR does not exist."
+    error "Deploy it first (what-if never creates shared resources):"
+    error "  ./scripts/deploy-shared.sh create"
+    exit 1
+  fi
+elif [[ "$SHARED_RG_STATE" == "Deleting" ]]; then
+  error "Shared resource group $SHARED_RG_NAME is still deleting (an ACR purge can take minutes)."
+  error "Wait until it is gone, then retry. Check with:"
+  error "  az group show --name \"$SHARED_RG_NAME\" --query properties.provisioningState -o tsv"
   exit 1
 fi
 if ! az acr show -n "$(registry_name)" >/dev/null 2>&1; then
-  error "Shared ACR $(registry_name) not found in $SHARED_RG_NAME."
-  error "Redeploy it with:"
-  error "  ./scripts/deploy-shared.sh create"
-  exit 1
+  if [[ "$ACTION" == "create" ]]; then
+    info "Shared ACR $(registry_name) not found in $SHARED_RG_NAME; redeploying it first..."
+    "$SCRIPT_DIR/deploy-shared.sh" create
+  else
+    error "Shared ACR $(registry_name) not found in $SHARED_RG_NAME."
+    error "Redeploy it with:"
+    error "  ./scripts/deploy-shared.sh create"
+    exit 1
+  fi
 fi
 success "Shared registry $(registry_name) found."
 
