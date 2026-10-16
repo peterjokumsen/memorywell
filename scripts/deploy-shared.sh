@@ -15,6 +15,8 @@ if [[ "$ACTION" != "create" && "$ACTION" != "what-if" ]]; then
   exit 1
 fi
 
+init_command_log "deploy-shared"
+
 # Subscription-deployment names must be unique per `az deployment sub create`
 # run (same reason as the env deployment in common.sh): re-using a name
 # overwrites history. Shared deployments get their own file so a shared run
@@ -27,10 +29,10 @@ else
   printf '%s' "$SHARED_DEPLOYMENT_NAME" > "$SHARED_DEPLOYMENT_FILE"
 fi
 
-az account set --subscription "$SUBSCRIPTION_ID"
+run az account set --subscription "$SUBSCRIPTION_ID"
 
 step "Checking shared resource group $SHARED_RG_NAME state..."
-if SHARED_RG_STATE=$(az group show --name "$SHARED_RG_NAME" --query properties.provisioningState -o tsv 2>/dev/null); then
+if SHARED_RG_STATE=$(run az group show --name "$SHARED_RG_NAME" --query properties.provisioningState -o tsv 2>/dev/null); then
   success "Resource group $SHARED_RG_NAME exists (provisioningState: $SHARED_RG_STATE)."
   if [[ "$SHARED_RG_STATE" == "Deleting" ]]; then
     error "Resource group $SHARED_RG_NAME is still deleting (an ACR purge can take minutes)."
@@ -52,7 +54,7 @@ log_vars \
   "Location=$LOCATION" \
   "Deployment=$SHARED_DEPLOYMENT_NAME"
 
-az deployment sub "$ACTION" \
+run az deployment sub "$ACTION" \
   --location "$LOCATION" \
   --name "$SHARED_DEPLOYMENT_NAME" \
   --template-file infra/shared.bicep \
@@ -63,9 +65,37 @@ if [[ "$ACTION" == "what-if" ]]; then
   exit 0
 fi
 
-SHARED_REGISTRY=$(az deployment sub show --name "$SHARED_DEPLOYMENT_NAME" \
+# The subscription deployment call above blocks, but the shared RG/ACR can
+# lag behind (eventual consistency) or report a non-terminal state on a
+# slow run. Poll the deployment provisioningState until it reads Succeeded.
+step "Waiting for shared deployment $SHARED_DEPLOYMENT_NAME to succeed..."
+attempt=1
+max_attempts=15 # 15 x 60s: ACR + RG propagation can take minutes
+while true; do
+  SHARED_STATE=$(run az deployment sub show --name "$SHARED_DEPLOYMENT_NAME" \
+    --query properties.provisioningState -o tsv 2>/dev/null || true)
+  if [[ "$SHARED_STATE" == "Succeeded" ]]; then
+    success "Shared deployment $SHARED_DEPLOYMENT_NAME succeeded."
+    break
+  fi
+  if [[ "$SHARED_STATE" == "Failed" || "$SHARED_STATE" == "Canceled" ]]; then
+    error "Shared deployment $SHARED_DEPLOYMENT_NAME ended with state: $SHARED_STATE."
+    run az deployment sub show --name "$SHARED_DEPLOYMENT_NAME" \
+      --query properties.error -o json 2>/dev/null || true
+    exit 1
+  fi
+  if [[ "$attempt" -ge "$max_attempts" ]]; then
+    error "Shared deployment $SHARED_DEPLOYMENT_NAME not Succeeded after $max_attempts checks (last state: ${SHARED_STATE:-unknown})."
+    exit 1
+  fi
+  warn "Attempt $attempt/$max_attempts: state is ${SHARED_STATE:-unknown}, retrying in 60s..."
+  sleep 60
+  attempt=$((attempt + 1))
+done
+
+SHARED_REGISTRY=$(run az deployment sub show --name "$SHARED_DEPLOYMENT_NAME" \
   --query properties.outputs.registryName.value -o tsv)
-SHARED_LOGIN_SERVER=$(az deployment sub show --name "$SHARED_DEPLOYMENT_NAME" \
+SHARED_LOGIN_SERVER=$(run az deployment sub show --name "$SHARED_DEPLOYMENT_NAME" \
   --query properties.outputs.loginServer.value -o tsv)
 
 log_vars \

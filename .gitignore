@@ -224,3 +224,6 @@ web/build/
 
 # Bicep compiled output (local build artifact, never commit)
 infra/**/*.json
+
+# Script command logs (local run history, never commit)
+logs/

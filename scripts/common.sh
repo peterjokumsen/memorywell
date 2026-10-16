@@ -37,6 +37,15 @@ export SHARED_ACR_NAME="$(echo "acr${BASE_NAME}" | tr '[:upper:]' '[:lower:]' | 
 registry_name() { echo "$SHARED_ACR_NAME"; }
 login_server() { echo "${SHARED_ACR_NAME}.azurecr.io"; }
 
+# Display name of the configured subscription (e.g. "My Subscription").
+# Queried lazily (explicit --subscription, so it never depends on the current
+# `az account set` context) so sourcing this file stays cheap and never fails
+# when logged out; callers use it for log lines only.
+subscription_name() {
+  az account show --subscription "$SUBSCRIPTION_ID" --query name -o tsv 2>/dev/null \
+    || echo "(unknown)"
+}
+
 # Subscription-deployment names must be unique per `az deployment sub create`
 # run: re-using a name overwrites history and can confuse `sub show` output
 # lookups. So each run gets a timestamped name
@@ -60,8 +69,60 @@ TIMESTAMP="${DEPLOYMENT_NAME##"${BASE_NAME}-${ENVIRONMENT}-"}"
 export IMAGE_TAG="${ENVIRONMENT}-${TIMESTAMP}"
 
 log_vars() {
+  # Two passes so the values align: first find the widest "key:", then print.
+  # (A fixed width breaks as soon as a longer key like "Shared resource group"
+  # shows up.)
+  local width=0 kvp key
   for kvp in "$@"; do
-    printf '  %-16s %s' "${kvp%%=*}:" "${kvp#*=}"
-      echo
+    key="${kvp%%=*}:"
+    if (( ${#key} > width )); then
+      width=${#key}
+    fi
   done
+  for kvp in "$@"; do
+    printf '  %-*s %s\n' "$width" "${kvp%%=*}:" "${kvp#*=}"
+  done
+}
+
+# Command log: `init_command_log <name>` creates
+# `$ROOT/logs/<name>-YYYYmmdd-HHMMSS.log` and sets COMMAND_LOG. `run` echoes
+# the command (`+ az ...`) to stderr, appends it to the log, then executes it.
+# Logging goes to stderr (not stdout) so `X=$(run az ...)` still captures only
+# the command's own output. Use `run` for every `az`/`curl` call, including
+# inside `if` conditions and `$(...)` captures.
+export COMMAND_LOG="${COMMAND_LOG:-}"
+init_command_log() {
+  local name="${1:?usage: init_command_log <name>}"
+  mkdir -p "$ROOT/logs"
+  COMMAND_LOG="$ROOT/logs/${name}-$(date -u +%Y%m%d-%H%M%S).log"
+  export COMMAND_LOG
+  info "Command log: $COMMAND_LOG"
+}
+
+# _join_quoted: shell-quote each arg (%q) so the logged line is copy-pasteable.
+_join_quoted() {
+  local out="" a piece
+  for a in "$@"; do
+    piece=$(printf '%q' "$a")
+    if [[ -z "$out" ]]; then
+      out="$piece"
+    else
+      out="$out $piece"
+    fi
+  done
+  printf '%s' "$out"
+}
+
+log_cmd() {
+  local cmd
+  cmd=$(_join_quoted "$@")
+  printf '+ %s\n' "$cmd" >&2
+  if [[ -n "${COMMAND_LOG:-}" ]]; then
+    printf '+ %s\n' "$cmd" >> "$COMMAND_LOG"
+  fi
+}
+
+run() {
+  log_cmd "$@"
+  "$@"
 }
