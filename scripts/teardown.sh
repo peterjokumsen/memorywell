@@ -33,6 +33,8 @@ done
 
 VAULT_NAME="kv-${BASE_NAME}-${ENVIRONMENT}"
 
+init_command_log "teardown"
+
 log_vars \
   "Subscription=$SUBSCRIPTION_ID" \
   "Resource group=$RG_NAME" \
@@ -40,14 +42,14 @@ log_vars \
   "PurgeVault=$PURGE_VAULT" \
   "DeleteShared=$DELETE_SHARED"
 
-az account set --subscription $SUBSCRIPTION_ID
+run az account set --subscription $SUBSCRIPTION_ID
 
 step "Groups in subscription $SUBSCRIPTION_ID:"
-az group list --query '[].name' -o tsv
+run az group list --query '[].name' -o tsv
 
 step "Deleting resource group $RG_NAME..."
-if [[ "$(az group exists --name "$RG_NAME" -o tsv)" == "true" ]]; then
-  az group delete --name "$RG_NAME" --yes --no-wait
+if [[ "$(run az group exists --name "$RG_NAME" -o tsv)" == "true" ]]; then
+  run az group delete --name "$RG_NAME" --yes --no-wait
 else
   info "Resource group $RG_NAME not found; skipping delete."
 fi
@@ -60,7 +62,7 @@ if [[ "$PURGE_VAULT" == "1" ]]; then
   step "Waiting for soft-deleted Key Vault $VAULT_NAME (up to ~5 min)..."
   attempt=1
   max_attempts=30
-  while ! az keyvault list-deleted --query "[?name=='$VAULT_NAME'].name" -o tsv 2>/dev/null | grep -q "$VAULT_NAME"; do
+  while ! run az keyvault list-deleted --query "[?name=='$VAULT_NAME'].name" -o tsv 2>/dev/null | grep -q "$VAULT_NAME"; do
     if [[ "$attempt" -ge "$max_attempts" ]]; then
       error "Vault $VAULT_NAME not soft-deleted yet; purge skipped. Retry later:"
       error "  az keyvault list-deleted --query \"[?name=='$VAULT_NAME']\" -o table"
@@ -72,7 +74,7 @@ if [[ "$PURGE_VAULT" == "1" ]]; then
     attempt=$((attempt + 1))
   done
   step "Purging soft-deleted Key Vault $VAULT_NAME..."
-  az keyvault purge --name "$VAULT_NAME"
+  run az keyvault purge --name "$VAULT_NAME"
   info "Environment resource group deleted, vault purged."
 else
   info "Skipping Key Vault purge (pass --purge-vault to purge $VAULT_NAME for same-name redeploy)."
@@ -82,8 +84,8 @@ fi
 # running container app can lose its image pull mid-teardown.
 if [[ "$DELETE_SHARED" == "1" ]]; then
   step "Deleting shared resource group $SHARED_RG_NAME..."
-  if [[ "$(az group exists --name "$SHARED_RG_NAME" -o tsv)" == "true" ]]; then
-    az group delete --name "$SHARED_RG_NAME" --yes --no-wait
+  if [[ "$(run az group exists --name "$SHARED_RG_NAME" -o tsv)" == "true" ]]; then
+    run az group delete --name "$SHARED_RG_NAME" --yes --no-wait
   else
     info "Shared resource group $SHARED_RG_NAME not found; skipping delete."
   fi
