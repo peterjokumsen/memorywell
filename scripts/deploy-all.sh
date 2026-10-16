@@ -11,8 +11,8 @@ source "$SCRIPT_DIR/common.sh"
 # Validate args before touching Azure (mirrors deploy-shared.sh/deploy.sh).
 ACTION="${1:-create}"
 if [[ "$ACTION" != "create" && "$ACTION" != "what-if" ]]; then
-  error "$1 is not a valid action"
-  echo "Usage: $0 [create|what-if]"
+  error "${1-} is not a valid action"
+  echo "Usage: $0 [create|what-if]" >&2
   exit 1
 fi
 

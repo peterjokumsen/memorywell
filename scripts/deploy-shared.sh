@@ -10,8 +10,8 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/common.sh"
 # Validate args before touching Azure.
 ACTION="${1:-create}"
 if [[ "$ACTION" != "create" && "$ACTION" != "what-if" ]]; then
-  error "$1 is not a valid action"
-  echo "Usage: $0 [create|what-if]"
+  error "${1-} is not a valid action"
+  echo "Usage: $0 [create|what-if]" >&2
   exit 1
 fi
 
@@ -32,7 +32,7 @@ fi
 run az account set --subscription "$SUBSCRIPTION_ID"
 
 step "Checking shared resource group $SHARED_RG_NAME state..."
-if SHARED_RG_STATE=$(run az group show --name "$SHARED_RG_NAME" --query properties.provisioningState -o tsv 2>/dev/null); then
+if SHARED_RG_STATE=$(run_hide_stderr az group show --name "$SHARED_RG_NAME" --query properties.provisioningState -o tsv); then
   success "Resource group $SHARED_RG_NAME exists (provisioningState: $SHARED_RG_STATE)."
   if [[ "$SHARED_RG_STATE" == "Deleting" ]]; then
     error "Resource group $SHARED_RG_NAME is still deleting (an ACR purge can take minutes)."
@@ -57,8 +57,8 @@ log_vars \
 run az deployment sub "$ACTION" \
   --location "$LOCATION" \
   --name "$SHARED_DEPLOYMENT_NAME" \
-  --template-file infra/shared.bicep \
-  --parameters infra/shared.bicepparam
+  --template-file "$ROOT/infra/shared.bicep" \
+  --parameters "$ROOT/infra/shared.bicepparam"
 
 if [[ "$ACTION" == "what-if" ]]; then
   success "What-if analysis completed. No changes were made."
@@ -72,16 +72,16 @@ step "Waiting for shared deployment $SHARED_DEPLOYMENT_NAME to succeed..."
 attempt=1
 max_attempts=15 # 15 x 60s: ACR + RG propagation can take minutes
 while true; do
-  SHARED_STATE=$(run az deployment sub show --name "$SHARED_DEPLOYMENT_NAME" \
-    --query properties.provisioningState -o tsv 2>/dev/null || true)
+  SHARED_STATE=$(run_hide_stderr az deployment sub show --name "$SHARED_DEPLOYMENT_NAME" \
+    --query properties.provisioningState -o tsv || true)
   if [[ "$SHARED_STATE" == "Succeeded" ]]; then
     success "Shared deployment $SHARED_DEPLOYMENT_NAME succeeded."
     break
   fi
   if [[ "$SHARED_STATE" == "Failed" || "$SHARED_STATE" == "Canceled" ]]; then
     error "Shared deployment $SHARED_DEPLOYMENT_NAME ended with state: $SHARED_STATE."
-    run az deployment sub show --name "$SHARED_DEPLOYMENT_NAME" \
-      --query properties.error -o json 2>/dev/null || true
+    run_hide_stderr az deployment sub show --name "$SHARED_DEPLOYMENT_NAME" \
+      --query properties.error -o json || true
     exit 1
   fi
   if [[ "$attempt" -ge "$max_attempts" ]]; then
@@ -93,10 +93,9 @@ while true; do
   attempt=$((attempt + 1))
 done
 
-SHARED_REGISTRY=$(run az deployment sub show --name "$SHARED_DEPLOYMENT_NAME" \
-  --query properties.outputs.registryName.value -o tsv)
-SHARED_LOGIN_SERVER=$(run az deployment sub show --name "$SHARED_DEPLOYMENT_NAME" \
-  --query properties.outputs.loginServer.value -o tsv)
+SHARED_OUTPUTS="$(fetch_deployment_outputs "$SHARED_DEPLOYMENT_NAME" \
+  "[properties.outputs.registryName.value, properties.outputs.loginServer.value]" 2)" || exit 1
+IFS=$'\t' read -r SHARED_REGISTRY SHARED_LOGIN_SERVER <<< "$SHARED_OUTPUTS" || true
 
 log_vars \
   "REGISTRY=$SHARED_REGISTRY" \

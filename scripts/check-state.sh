@@ -27,7 +27,7 @@ for arg in "$@"; do
     --shared-only) CHECK_ENV=0 ;;
     *)
       error "Unknown argument: $arg"
-      echo "Usage: $0 [--env-only] [--shared-only]"
+      echo "Usage: $0 [--env-only] [--shared-only]" >&2
       exit 2
       ;;
   esac
@@ -52,7 +52,7 @@ check_group() {
   local rg_state entries id name state bad=0
 
   step "Resource group $rg ($label)..."
-  if rg_state=$(run az group show --name "$rg" --query properties.provisioningState -o tsv 2>/dev/null); then
+  if rg_state=$(run_hide_stderr az group show --name "$rg" --query properties.provisioningState -o tsv); then
     info "  provisioningState: $rg_state"
     [[ "$rg_state" == "Succeeded" ]] || OVERALL=1
   else
@@ -61,13 +61,15 @@ check_group() {
   fi
 
   step "Resources in $rg:"
-  entries=$(run az resource list --resource-group "$rg" --query "sort_by(@, &name)[].{n:name, i:id}" -o tsv)
-  if [[ -z "$entries" ]]; then
+  if ! entries=$(run az resource list --resource-group "$rg" --query "sort_by(@, &name)[].{n:name, i:id}" -o tsv); then
+    warn "Could not list resources in $rg (see above); skipping resource check."
+    OVERALL=1
+  elif [[ -z "$entries" ]]; then
     info "  (no resources)"
   else
     while IFS=$'\t' read -r name id; do
       [[ -z "$name" ]] && continue
-      state=$(run az resource show --ids "$id" --query provisioningState -o tsv 2>/dev/null || true)
+      state=$(run_hide_stderr az resource show --ids "$id" --query provisioningState -o tsv || true)
       state="${state:-n/a}"
       printf '  %s: %s\n' "$name" "$state"
       if [[ "$state" != "Succeeded" && "$state" != "n/a" ]]; then
@@ -83,11 +85,14 @@ check_group() {
   fi
 
   step "Latest deployments in $rg:"
-  print_deployment_rows \
-    "$(run az deployment group list --resource-group "$rg" \
+  if deploy_rows=$(run az deployment group list --resource-group "$rg" \
       --query "sort_by(@, &properties.timestamp)[].{n:name, t:properties.timestamp, s:properties.provisioningState}" \
-      -o tsv | tail -n 3)" \
-    "resource-group $rg"
+      -o tsv | tail -n 3); then
+    print_deployment_rows "$deploy_rows" "resource-group $rg"
+  else
+    warn "Could not list deployments in $rg (see above); skipping."
+    OVERALL=1
+  fi
 }
 
 # print_deployment_rows <tsv-rows> <label>: prints one `name (timestamp):
@@ -130,20 +135,26 @@ fi
 
 if [[ "$CHECK_ENV" == "1" ]]; then
   step "Latest environment subscription deployments..."
-  print_deployment_rows \
-    "$(run az deployment sub list \
+  if env_deploy_rows=$(run az deployment sub list \
       --query "sort_by(@, &properties.timestamp)[?starts_with(name, '${BASE_NAME}-${ENVIRONMENT}-')].{n:name, t:properties.timestamp, s:properties.provisioningState}" \
-      -o tsv | tail -n 3)" \
-    "environment"
+      -o tsv | tail -n 3); then
+    print_deployment_rows "$env_deploy_rows" "environment"
+  else
+    warn "Could not list environment subscription deployments (see above); skipping."
+    OVERALL=1
+  fi
 fi
 
 if [[ "$CHECK_SHARED" == "1" ]]; then
   step "Latest shared subscription deployments..."
-  print_deployment_rows \
-    "$(run az deployment sub list \
+  if shared_deploy_rows=$(run az deployment sub list \
       --query "sort_by(@, &properties.timestamp)[?starts_with(name, '${BASE_NAME}-shared-')].{n:name, t:properties.timestamp, s:properties.provisioningState}" \
-      -o tsv | tail -n 3)" \
-    "shared"
+      -o tsv | tail -n 3); then
+    print_deployment_rows "$shared_deploy_rows" "shared"
+  else
+    warn "Could not list shared subscription deployments (see above); skipping."
+    OVERALL=1
+  fi
 fi
 
 if [[ "$OVERALL" == "0" ]]; then

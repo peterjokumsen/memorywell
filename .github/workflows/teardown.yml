@@ -40,6 +40,10 @@ jobs:
   teardown:
     name: Teardown ${{ inputs.environment || 'dev' }}
     runs-on: ubuntu-latest
+    # `environment` here is a GitHub Environment (protection rules + the OIDC
+    # federated credential; see docs/CI_TEARDOWN.md) — not to be confused with
+    # the `environment` workflow *input* below, which is the resource-group
+    # name suffix in rg-<base>-<environment>.
     environment: azure # holds the OIDC federated credential; see docs/CI_TEARDOWN.md
     timeout-minutes: 45
 
@@ -181,8 +185,13 @@ jobs:
           fi
 
           # An un-purged soft-deleted vault blocks the next same-name deploy,
-          # so a leftover one fails the run loudly.
-          if az keyvault list-deleted --query "[?name=='$VAULT_NAME'].name" -o tsv 2>/dev/null | grep -q "$VAULT_NAME"; then
+          # so a leftover one fails the run loudly. The list call itself must
+          # not be piped straight into grep: an `az` failure would look like
+          # "no vault found" and pass silently.
+          if ! deleted_vaults=$(az keyvault list-deleted --query "[?name=='$VAULT_NAME'].name" -o tsv); then
+            echo "::error::Failed to list soft-deleted Key Vaults; cannot verify purge of $VAULT_NAME."
+            status=1
+          elif printf '%s\n' "$deleted_vaults" | grep -q "$VAULT_NAME"; then
             echo "::error::Key Vault $VAULT_NAME is still soft-deleted; purge it manually:"
             echo "  az keyvault purge --name '$VAULT_NAME'"
             status=1
