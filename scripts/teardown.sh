@@ -52,6 +52,7 @@ if [[ "$(run az group exists --name "$RG_NAME" -o tsv)" == "true" ]]; then
   run az group delete --name "$RG_NAME" --yes --no-wait
 else
   info "Resource group $RG_NAME not found; skipping delete."
+  exit 0
 fi
 
 # Key Vault uses soft-delete: after the RG is gone the vault lingers in
