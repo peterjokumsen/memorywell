@@ -122,7 +122,8 @@ jobs:
       # Matches the bicep-format local hook in .pre-commit-config.yaml: Space
       # indent, size 2, final newline. Formats a copy of the whole tree so
       # module paths still resolve, then diffs, so a failure shows the exact
-      # change instead of silently rewriting the repo.
+      # change instead of silently rewriting the repo. Covers .bicep and
+      # .bicepparam alike (keep the find patterns in sync with the hook).
       - name: Check bicep formatting
         run: |
           set -euo pipefail
@@ -131,7 +132,7 @@ jobs:
           while IFS= read -r file; do
             bicep format "$file" --outfile "$file" \
               --indent-kind Space --indent-size 2 --insert-final-newline
-          done < <(find "$tmp/infra" -name '*.bicep' | sort)
+          done < <(find "$tmp/infra" \( -name '*.bicep' -o -name '*.bicepparam' \) | sort)
           diff -ru infra "$tmp/infra"
 
   shell:
@@ -152,11 +153,9 @@ jobs:
             echo "::endgroup::"
           done < <(find scripts -name '*.sh' | sort)
 
-      # Informational for now: scripts/ already carries SC2155 (export X="$(...)")
-      # and common.sh is sourced, so SC2148 has no shebang to find. Drop
-      # continue-on-error once those are cleaned up to make shellcheck a gate.
+      # Gate: warning-level shellcheck over scripts/. common.sh is sourced
+      # (no shebang), so it declares `# shellcheck shell=bash` instead.
       - name: shellcheck
-        continue-on-error: true
         run: |
           set -euo pipefail
-          shellcheck --severity=warning --exclude=SC2148 scripts/*.sh
+          shellcheck --severity=warning scripts/*.sh

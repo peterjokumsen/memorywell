@@ -7,15 +7,21 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/common.sh"
 # Validate args before touching Azure.
 ACTION="${1:-create}"
 if [[ "$ACTION" != "create" && "$ACTION" != "what-if" ]]; then
-  error "$1 is not a valid action"
-  echo "Usage: $0 [create|what-if]"
+  error "${1-} is not a valid action"
+  echo "Usage: $0 [create|what-if]" >&2
   exit 1
 fi
 
 init_command_log "deploy"
 
+# Mint the timestamped deployment name + image tag (lazy: sourcing common.sh
+# alone reserves nothing; see deployment_name in common.sh).
+DEPLOYMENT_NAME="$(deployment_name)"
+IMAGE_TAG="$(image_tag)"
+export DEPLOYMENT_NAME IMAGE_TAG
+
 # Set the subscription context for Azure CLI commands
-run az account set --subscription $SUBSCRIPTION_ID
+run az account set --subscription "$SUBSCRIPTION_ID"
 
 # The ACR lives in the shared resource group and must exist before the env
 # deployment: main.bicep declares it as `existing`, so a missing registry fails
@@ -24,7 +30,7 @@ run az account set --subscription $SUBSCRIPTION_ID
 # `what-if` never creates anything, so it still fails fast with the fix.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 step "Checking shared resource group $SHARED_RG_NAME (ACR)..."
-if ! SHARED_RG_STATE=$(run az group show --name "$SHARED_RG_NAME" --query properties.provisioningState -o tsv 2>/dev/null); then
+if ! SHARED_RG_STATE=$(run_hide_stderr az group show --name "$SHARED_RG_NAME" --query properties.provisioningState -o tsv); then
   if [[ "$ACTION" == "create" ]]; then
     info "Shared resource group $SHARED_RG_NAME not found; deploying it first..."
     run "$SCRIPT_DIR/deploy-shared.sh" create
@@ -40,7 +46,7 @@ elif [[ "$SHARED_RG_STATE" == "Deleting" ]]; then
   error "  az group show --name \"$SHARED_RG_NAME\" --query properties.provisioningState -o tsv"
   exit 1
 fi
-if ! run az acr show -n "$(registry_name)" >/dev/null 2>&1; then
+if ! run_quiet az acr show -n "$(registry_name)"; then
   if [[ "$ACTION" == "create" ]]; then
     info "Shared ACR $(registry_name) not found in $SHARED_RG_NAME; redeploying it first..."
     run "$SCRIPT_DIR/deploy-shared.sh" create
@@ -58,7 +64,7 @@ success "Shared registry $(registry_name) found."
 # takes a while to delete, so the RG lingers in Deleting state; a Bicep
 # sub-deployment issued in that window fails. Fail fast instead.
 step "Checking resource group $RG_NAME state..."
-if RG_STATE=$(run az group show --name "$RG_NAME" --query properties.provisioningState -o tsv 2>/dev/null); then
+if RG_STATE=$(run_hide_stderr az group show --name "$RG_NAME" --query properties.provisioningState -o tsv); then
   success "Resource group $RG_NAME exists (provisioningState: $RG_STATE)."
   if [[ "$RG_STATE" == "Deleting" ]]; then
     error "Resource group $RG_NAME is still deleting (managed environment teardown is slow)."
@@ -76,13 +82,14 @@ step "Checking if image exists in ACR..."
 # `api:<env>` tag can be missing (first deploy, or after a `--shared`
 # teardown). Fall back to the helloworld image in that case — the real image is
 # pushed by `az acr build` below (set -e does not trigger inside `if`).
-if run az acr repository show-tags -n "$(registry_name)" --repository api 2>/dev/null | grep -q "$ENVIRONMENT"; then
+if run_hide_stderr az acr repository show-tags -n "$(registry_name)" --repository api | grep -q "$ENVIRONMENT"; then
   success "Image api:$ENVIRONMENT exists in ACR, using it for deployment."
-  export IMAGE="$(login_server)/api:$ENVIRONMENT"
+  IMAGE="$(login_server)/api:$ENVIRONMENT"
 else
   warn "api:$ENVIRONMENT tag not found in $(registry_name), using default image for deployment."
-  export IMAGE="mcr.microsoft.com/azuredocs/containerapps-helloworld:latest"
+  IMAGE="mcr.microsoft.com/azuredocs/containerapps-helloworld:latest"
 fi
+export IMAGE
 
 # Deploy the Bicep template to create the resource group and other resources
 log_vars \
@@ -96,24 +103,21 @@ log_vars \
   "ImageTag=$IMAGE_TAG"
 
 run az deployment sub "$ACTION" \
-  --location $LOCATION \
-  --name $DEPLOYMENT_NAME \
-  --template-file infra/main.bicep \
-  --parameters infra/main.bicepparam
+  --location "$LOCATION" \
+  --name "$DEPLOYMENT_NAME" \
+  --template-file "$ROOT/infra/main.bicep" \
+  --parameters "$ROOT/infra/main.bicepparam"
 
 if [[ "$ACTION" == "what-if" ]]; then
   success "What-if analysis completed. No changes were made."
   exit 0
 fi
 
-REGISTRY=$(run az deployment sub show --name "$DEPLOYMENT_NAME" \
-  --query properties.outputs.registryName.value -o tsv)
-LOGIN_SERVER=$(run az deployment sub show --name "$DEPLOYMENT_NAME" \
-  --query properties.outputs.loginServer.value -o tsv)
-APP_NAME=$(run az deployment sub show --name "$DEPLOYMENT_NAME" \
-  --query properties.outputs.appName.value -o tsv)
-FQDN=$(run az deployment sub show --name "$DEPLOYMENT_NAME" \
-  --query properties.outputs.fqdn.value -o tsv)
+# One round trip for all four outputs (array order is preserved in -o tsv).
+# Outputs can lag the Succeeded state (ARM eventual consistency), so poll.
+DEPLOYMENT_OUTPUTS="$(fetch_deployment_outputs "$DEPLOYMENT_NAME" \
+  "[properties.outputs.registryName.value, properties.outputs.loginServer.value, properties.outputs.appName.value, properties.outputs.fqdn.value]" 4)" || exit 1
+IFS=$'\t' read -r REGISTRY LOGIN_SERVER APP_NAME FQDN <<< "$DEPLOYMENT_OUTPUTS" || true
 
 log_vars \
   "REGISTRY=$REGISTRY" \
@@ -130,12 +134,12 @@ step "Building and pushing Docker image to ACR..."
 # Push both the floating env tag (keeps the Bicep pre-check working and marks
 # latest-stable) and the unique timestamp tag (guarantees a template-string
 # change so `containerapp update` mints a new revision every run).
-run az acr build -r "$REGISTRY" -t api:$ENVIRONMENT -t api:$IMAGE_TAG ./api
+run az acr build -r "$REGISTRY" -t api:$ENVIRONMENT -t api:$IMAGE_TAG "$ROOT/api"
 
 step "Deploying container app..."
 run az containerapp update \
   --name "$APP_NAME" \
-  --resource-group $RG_NAME \
+  --resource-group "$RG_NAME" \
   --image "$LOGIN_SERVER/api:$IMAGE_TAG"
 
 step "Waiting for https://${FQDN}/health ..."

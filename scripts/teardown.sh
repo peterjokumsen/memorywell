@@ -25,7 +25,7 @@ for arg in "$@"; do
     --shared) DELETE_SHARED=1 ;;
     *)
       error "Unknown argument: $arg"
-      echo "Usage: $0 [--purge-vault] [--shared]"
+      echo "Usage: $0 [--purge-vault] [--shared]" >&2
       exit 1
       ;;
   esac
@@ -42,41 +42,52 @@ log_vars \
   "PurgeVault=$PURGE_VAULT" \
   "DeleteShared=$DELETE_SHARED"
 
-run az account set --subscription $SUBSCRIPTION_ID
+run az account set --subscription "$SUBSCRIPTION_ID"
 
 step "Groups in subscription $SUBSCRIPTION_ID:"
 run az group list --query '[].name' -o tsv
 
 step "Deleting resource group $RG_NAME..."
-if [[ "$(run az group exists --name "$RG_NAME" -o tsv)" == "true" ]]; then
+# No early exit when the group is absent: the vault purge and the optional
+# shared-RG delete below must still run (e.g. scheduled run after a previous
+# teardown already removed the group).
+ENV_RG_EXISTS="$(group_exists "$RG_NAME")" || exit 1
+if [[ "$ENV_RG_EXISTS" == "true" ]]; then
   run az group delete --name "$RG_NAME" --yes --no-wait
 else
   info "Resource group $RG_NAME not found; skipping delete."
-  exit 0
 fi
 
 # Key Vault uses soft-delete: after the RG is gone the vault lingers in
 # "deleted" state and blocks same-name redeploy. Purge is opt-in via
 # --purge-vault because the RG delete is async (--no-wait) and the vault may
-# take minutes to reach soft-deleted state.
+# take minutes to reach soft-deleted state. When the vault is neither live
+# nor soft-deleted (e.g. a repeat run after it was already purged), there is
+# nothing to wait for — skip instead of timing out.
 if [[ "$PURGE_VAULT" == "1" ]]; then
-  step "Waiting for soft-deleted Key Vault $VAULT_NAME (up to ~5 min)..."
-  attempt=1
-  max_attempts=30
-  while ! run az keyvault list-deleted --query "[?name=='$VAULT_NAME'].name" -o tsv 2>/dev/null | grep -q "$VAULT_NAME"; do
-    if [[ "$attempt" -ge "$max_attempts" ]]; then
-      error "Vault $VAULT_NAME not soft-deleted yet; purge skipped. Retry later:"
-      error "  az keyvault list-deleted --query \"[?name=='$VAULT_NAME']\" -o table"
-      error "  az keyvault purge --name \"$VAULT_NAME\""
-      exit 1
+  if ! vault_is_soft_deleted "$VAULT_NAME" && ! vault_is_live "$VAULT_NAME"; then
+    info "Key Vault $VAULT_NAME not found (neither live nor soft-deleted); skipping purge."
+  else
+    if ! vault_is_soft_deleted "$VAULT_NAME"; then
+      step "Waiting for soft-deleted Key Vault $VAULT_NAME (up to ~5 min)..."
+      attempt=1
+      max_attempts=30
+      while ! vault_is_soft_deleted "$VAULT_NAME"; do
+        if [[ "$attempt" -ge "$max_attempts" ]]; then
+          error "Vault $VAULT_NAME not soft-deleted yet; purge skipped. Retry later:"
+          error "  az keyvault list-deleted --query \"[?name=='$VAULT_NAME']\" -o table"
+          error "  az keyvault purge --name \"$VAULT_NAME\""
+          exit 1
+        fi
+        warn "Attempt $attempt/$max_attempts: not soft-deleted yet, retrying in 10s..."
+        sleep 10
+        attempt=$((attempt + 1))
+      done
     fi
-    warn "Attempt $attempt/$max_attempts: not soft-deleted yet, retrying in 10s..."
-    sleep 10
-    attempt=$((attempt + 1))
-  done
-  step "Purging soft-deleted Key Vault $VAULT_NAME..."
-  run az keyvault purge --name "$VAULT_NAME"
-  info "Environment resource group deleted, vault purged."
+    step "Purging soft-deleted Key Vault $VAULT_NAME..."
+    run az keyvault purge --name "$VAULT_NAME"
+    info "Environment resource group deleted, vault purged."
+  fi
 else
   info "Skipping Key Vault purge (pass --purge-vault to purge $VAULT_NAME for same-name redeploy)."
 fi
@@ -85,7 +96,8 @@ fi
 # running container app can lose its image pull mid-teardown.
 if [[ "$DELETE_SHARED" == "1" ]]; then
   step "Deleting shared resource group $SHARED_RG_NAME..."
-  if [[ "$(run az group exists --name "$SHARED_RG_NAME" -o tsv)" == "true" ]]; then
+  SHARED_RG_EXISTS="$(group_exists "$SHARED_RG_NAME")" || exit 1
+  if [[ "$SHARED_RG_EXISTS" == "true" ]]; then
     run az group delete --name "$SHARED_RG_NAME" --yes --no-wait
   else
     info "Shared resource group $SHARED_RG_NAME not found; skipping delete."
