@@ -45,9 +45,10 @@ else
   SHARED_RG_STATE="absent"
 fi
 
+step "Starting $ACTION for $SHARED_RG_NAME"
 log_vars \
   "Action=$ACTION" \
-  "Subscription=$SUBSCRIPTION_ID" \
+  "Subscription=$(subscription_name) ($SUBSCRIPTION_ID)" \
   "Shared resource group=$SHARED_RG_NAME" \
   "RG state=$SHARED_RG_STATE" \
   "Registry=$SHARED_ACR_NAME" \

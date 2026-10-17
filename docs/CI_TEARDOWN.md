@@ -219,5 +219,5 @@ slow — recreate it with `./scripts/deploy-shared.sh`.
 ## 6. Related
 
 - `scripts/teardown.sh` — the script this workflow calls (flags: `--purge-vault`, `--shared`)
-- `scripts/common.sh` — naming rules (`rg-<base>-<env>`, `kv-<base>-<env>`, `rg-<base>-shared`)
+- `scripts/common.sh` — naming rules (`rg-<base>-<env>`, `kv-<base>-<env>`, `rg-<base>-shared`); these are the single source of truth, since `infra/main.bicepparam` reads the exported `VAULT_NAME`/`RG_NAME`/`SHARED_RG_NAME` env vars rather than rebuilding names itself
 - `docs/PLAN.md` § Cost & safety — the cost model this workflow protects

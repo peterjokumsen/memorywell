@@ -36,6 +36,14 @@ SHARED_RG_NAME="rg-${BASE_NAME}-shared"
 export SHARED_RG_NAME
 SHARED_ACR_NAME="$(echo "acr${BASE_NAME}" | tr '[:upper:]' '[:lower:]' | tr -d '-')"
 export SHARED_ACR_NAME
+# Key Vault name for this environment, and the single source of truth for it:
+# deploy.sh/teardown.sh probe the vault by this name, and infra/main.bicepparam
+# reads it back through readEnvironmentVariable('VAULT_NAME'), so the template
+# never rebuilds the name from baseName/environment. Keep in mind the name is
+# globally unique: changing BASE_NAME or ENVIRONMENT changes it, and a
+# soft-deleted vault keeps the old name reserved until it is purged.
+VAULT_NAME="kv-${BASE_NAME}-${ENVIRONMENT}"
+export VAULT_NAME
 
 registry_name() { echo "$SHARED_ACR_NAME"; }
 login_server() { echo "${SHARED_ACR_NAME}.azurecr.io"; }
@@ -237,14 +245,14 @@ group_exists() {
   esac
 }
 
-# vault_is_live <vault-name>: succeeds when the vault exists (not deleted).
-# vault_is_soft_deleted <vault-name>: succeeds when a soft-deleted vault of
+# vault_is_live: succeeds when the vault named by the global VAULT_NAME exists
+# (not deleted). vault_is_soft_deleted: succeeds when a soft-deleted vault of
 # that name is waiting for purge. Both hide the command's stderr: absence is
 # an expected outcome for these probes.
 vault_is_live() {
-  run_hide_stderr az keyvault show --name "$1" >/dev/null
+  run_hide_stderr az keyvault show --name "$VAULT_NAME" >/dev/null
 }
 
 vault_is_soft_deleted() {
-  run_hide_stderr az keyvault list-deleted --query "[?name=='$1'].name" -o tsv | grep -q "$1"
+  run_hide_stderr az keyvault list-deleted --query "[?name=='$VAULT_NAME'].name" -o tsv | grep -q "$VAULT_NAME"
 }

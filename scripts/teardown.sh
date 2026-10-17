@@ -31,8 +31,6 @@ for arg in "$@"; do
   esac
 done
 
-VAULT_NAME="kv-${BASE_NAME}-${ENVIRONMENT}"
-
 init_command_log "teardown"
 
 log_vars \
@@ -65,14 +63,14 @@ fi
 # nor soft-deleted (e.g. a repeat run after it was already purged), there is
 # nothing to wait for — skip instead of timing out.
 if [[ "$PURGE_VAULT" == "1" ]]; then
-  if ! vault_is_soft_deleted "$VAULT_NAME" && ! vault_is_live "$VAULT_NAME"; then
+  if ! vault_is_soft_deleted && ! vault_is_live; then
     info "Key Vault $VAULT_NAME not found (neither live nor soft-deleted); skipping purge."
   else
-    if ! vault_is_soft_deleted "$VAULT_NAME"; then
+    if ! vault_is_soft_deleted; then
       step "Waiting for soft-deleted Key Vault $VAULT_NAME (up to ~5 min)..."
       attempt=1
       max_attempts=30
-      while ! vault_is_soft_deleted "$VAULT_NAME"; do
+      while ! vault_is_soft_deleted; do
         if [[ "$attempt" -ge "$max_attempts" ]]; then
           error "Vault $VAULT_NAME not soft-deleted yet; purge skipped. Retry later:"
           error "  az keyvault list-deleted --query \"[?name=='$VAULT_NAME']\" -o table"
