@@ -168,6 +168,7 @@ jobs:
 
           timeout_min="${RG_WAIT_TIMEOUT_MINUTES:-30}"
           poll_seconds="${RG_POLL_SECONDS:-20}"
+          [[ "$poll_seconds" -ge 1 ]] || poll_seconds=20
           max_attempts=$((timeout_min * 60 / poll_seconds))
           [[ "$max_attempts" -ge 1 ]] || max_attempts=1
 

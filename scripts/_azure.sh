@@ -118,14 +118,10 @@ group_exists() {
   esac
 }
 
-# vault_is_live: succeeds when the vault named by the global VAULT_NAME exists
-# (not deleted). vault_is_soft_deleted: succeeds when a soft-deleted vault of
-# that name is waiting for purge. Both hide the command's stderr: absence is
-# an expected outcome for these probes.
-vault_is_live() {
-  run_hide_stderr az keyvault show --name "$VAULT_NAME" >/dev/null
-}
-
+# vault_is_soft_deleted: succeeds when a soft-deleted vault of that name is
+# waiting for purge. Hides the command's stderr: absence is an expected outcome
+# for the probe. (teardown.sh deliberately does not use a "is it live?" probe:
+# in the window after `group delete --no-wait` the vault answers neither way.)
 vault_is_soft_deleted() {
   run_hide_stderr az keyvault list-deleted --query "[?name=='$VAULT_NAME'].name" -o tsv | grep -q "$VAULT_NAME"
 }

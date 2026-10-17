@@ -10,14 +10,15 @@
 #   ./scripts/check-state.sh                    full report, writes logs/
 #   ./scripts/check-state.sh --rg <name>        single-group report, no logs
 #
-# --rg mode exists for the teardown workflow's Verify step, which polls one
-# group until it disappears: it prints nothing but the group's provisioning
-# state and its resources' states, keeps the `+ az ...` traces off the console
-# (TRACE_COMMANDS=0) and writes no log files, and encodes the answer in the
-# exit code so the caller does not have to parse the report:
-#   0  group absent — gone (or never existed); the teardown's success signal
+# --rg mode exists for the teardown workflow's Verify step, which reports on
+# one resource group while it drains: it prints nothing but the group's
+# provisioning state and its resources' states, keeps the `+ az ...` traces off
+# the console (TRACE_COMMANDS=0) and writes no log files, and encodes the
+# answer in the exit code so the caller does not have to parse the report:
+#   0  group absent — gone, or never created
 #   1  present, but something is not Succeeded
 #   2  present and everything Succeeded
+#   64 usage error (never collides with a verdict)
 set -euo pipefail
 
 # prepare environment variables
@@ -71,20 +72,30 @@ while [[ $# -gt 0 ]]; do
   shift
 done
 
-# In --rg mode the report is the product, so the probes stay quiet: no command
-# traces, no command log. Set before the first `run` below.
-if [[ -n "$RG_ONLY" ]]; then
-  export TRACE_COMMANDS=0
-else
-  init_command_log "check-state"
+# --rg= with nothing after it would otherwise fall through to the full report,
+# silently ignoring the flag.
+if [[ -n "${RG_ONLY+x}" && -z "$RG_ONLY" ]]; then
+  error "--rg needs a resource group name"
+  usage >&2
+  exit 64
+fi
+# --rg names the group, so the env/shared selectors would just be ignored:
+# say so rather than quietly dropping one of them.
+if [[ -n "$RG_ONLY" && ( "$CHECK_ENV" -eq 0 || "$CHECK_SHARED" -eq 0 ) ]]; then
+  error "--rg cannot be combined with --env-only or --shared-only"
+  usage >&2
+  exit 64
 fi
 
-# The subscription context has to be explicit: this script may run on a
-# machine where `az account set` was never called. The narration is skipped in
-# --rg mode, where the report must be the only output.
+# In --rg mode the report is the product, so the probes stay quiet: no command
+# traces, no command log. The subscription context still has to be explicit
+# (this script may run where `az account set` was never called), but its
+# narration is skipped. Both before the first `run` below.
 if [[ -n "$RG_ONLY" ]]; then
+  export TRACE_COMMANDS=0
   run az account set --subscription "$SUBSCRIPTION_ID"
 else
+  init_command_log "check-state"
   step "Setting subscription..."
   run az account set --subscription "$SUBSCRIPTION_ID"
 fi
