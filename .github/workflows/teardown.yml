@@ -45,7 +45,9 @@ jobs:
     # the `environment` workflow *input* below, which is the resource-group
     # name suffix in rg-<base>-<environment>.
     environment: azure # holds the OIDC federated credential; see docs/CI_TEARDOWN.md
-    timeout-minutes: 45
+    # Worst case: teardown.sh's 5 min vault wait + Verify's 30 min group wait +
+    # 5 min vault wait, with headroom for Azure's own latency.
+    timeout-minutes: 60
 
     steps:
       - name: Check out repo
@@ -119,6 +121,11 @@ jobs:
         if: steps.config.outputs.dry_run == '0'
         env:
           DELETE_SHARED: ${{ steps.config.outputs.delete_shared }}
+          # teardown.sh waits this long for the vault to surface as
+          # soft-deleted after `group delete --no-wait`. Short on purpose: the
+          # Verify step owns the long wait (it is already polling the group),
+          # and this must not eat into the job's timeout budget.
+          VAULT_PURGE_WAIT_MINUTES: "5"
         run: |
           set -euo pipefail
           flags=(--purge-vault)
@@ -146,57 +153,102 @@ jobs:
           ENVIRONMENT: ${{ steps.config.outputs.environment }}
           VAULT_NAME: ${{ steps.config.outputs.vault_name }}
           # The RG delete is async (teardown.sh uses --no-wait). Draining the
-          # managed environment alone routinely takes >5 min, so allow 30.
+          # managed environment alone routinely takes >5 min, so allow 30,
+          # checked every 10.
           RG_WAIT_TIMEOUT_MINUTES: "30"
-          RG_POLL_SECONDS: "20"
+          RG_CHECK_INTERVAL_MINUTES: "10"
+          # After the group is gone the vault can take a further few minutes to
+          # surface as soft-deleted; purge it rather than failing the run.
+          VAULT_SOFT_DELETE_WAIT_MINUTES: "10"
         run: |
           set -euo pipefail
           rg_name="rg-$BASE_NAME-$ENVIRONMENT"
           status=0
 
           timeout_min="${RG_WAIT_TIMEOUT_MINUTES:-30}"
-          poll_seconds="${RG_POLL_SECONDS:-20}"
-          max_attempts=$((timeout_min * 60 / poll_seconds))
-          max_attempts=$((max_attempts < 1 ? 1 : max_attempts))
-          echo "Waiting up to ${timeout_min} min (${max_attempts} checks, one every ${poll_seconds}s) for resource group $rg_name to disappear..."
+          interval_min="${RG_CHECK_INTERVAL_MINUTES:-10}"
+          max_checks=$((timeout_min / interval_min))
+          [[ "$max_checks" -ge 1 ]] || max_checks=1
 
+          # Poll with check-state.sh --rg: it reports the group's provisioning
+          # state and its resources' states (so the drain in progress is
+          # visible), keeps the `+ az ...` traces off the console, and encodes
+          # the verdict in its exit code — 0 gone, 1 not Succeeded, 2 all
+          # Succeeded. Checked once up front, then every interval_min.
           gone=0
-          for attempt in $(seq 1 "$max_attempts"); do
-            if ! az group show --name "$rg_name" >/dev/null 2>&1; then
-              echo "Check $attempt/$max_attempts: resource group $rg_name is gone."
-              gone=1
-              break
-            fi
-            remaining=$(((max_attempts - attempt) * poll_seconds / 60))
-            if (( attempt % 5 == 0 || attempt == 1 )); then
-              echo "Check $attempt/$max_attempts: $rg_name still exists (~${remaining} min left in budget)."
-            fi
-            if (( attempt == max_attempts )); then
-              echo "::error::Resource group $rg_name still exists after ${timeout_min} min."
-              status=1
-              break
-            fi
-            sleep "$poll_seconds"
+          for check in $(seq 0 "$max_checks"); do
+            echo "== check $check/$max_checks for $rg_name"
+            rc=0
+            ./scripts/check-state.sh --rg "$rg_name" || rc=$?
+            case "$rc" in
+              0)
+                gone=1
+                echo "Resource group $rg_name is gone."
+                break
+                ;;
+              1)
+                echo "Resource group $rg_name still exists, with resources not Succeeded."
+                ;;
+              2)
+                echo "Resource group $rg_name still exists and everything in it is Succeeded."
+                ;;
+              *)
+                # Not a verdict: a usage error (64) or a crash. Do not keep
+                # polling for 30 minutes on a broken script.
+                echo "::error::check-state.sh --rg exited with $rc; cannot tell whether $rg_name is gone."
+                status=1
+                break
+                ;;
+            esac
+            [[ "$check" -lt "$max_checks" ]] || break
+            echo "Sleeping ${interval_min} min before the next check..."
+            sleep $((interval_min * 60))
           done
 
-          if (( gone == 0 && status == 0 )); then
-            echo "::error::Resource group $rg_name check loop exited unexpectedly."
+          if [[ "$gone" -eq 0 ]]; then
+            echo "::error::Resource group $rg_name still exists after ${timeout_min} min."
             status=1
           fi
 
-          # An un-purged soft-deleted vault blocks the next same-name deploy,
-          # so a leftover one fails the run loudly. The list call itself must
-          # not be piped straight into grep: an `az` failure would look like
-          # "no vault found" and pass silently.
-          if ! deleted_vaults=$(az keyvault list-deleted --query "[?name=='$VAULT_NAME'].name" -o tsv); then
-            echo "::error::Failed to list soft-deleted Key Vaults; cannot verify purge of $VAULT_NAME."
-            status=1
-          elif printf '%s\n' "$deleted_vaults" | grep -q "$VAULT_NAME"; then
-            echo "::error::Key Vault $VAULT_NAME is still soft-deleted; purge it manually:"
-            echo "  az keyvault purge --name '$VAULT_NAME'"
-            status=1
-          else
-            echo "Key Vault $VAULT_NAME is not soft-deleted."
+          # A soft-deleted Key Vault blocks the next same-name deploy, but it
+          # only shows up in list-deleted *after* the group is gone — so a run
+          # that judged the vault too early used to fail here even though
+          # teardown.sh had simply not seen it yet. Wait for it to surface,
+          # then purge it: that is the state the next deploy needs. If it never
+          # appears, the vault was already purged (or never existed).
+          #
+          # The list call must not be piped straight into grep: an `az` failure
+          # would look like "no vault found" and pass silently.
+          vault_wait_min="${VAULT_SOFT_DELETE_WAIT_MINUTES:-10}"
+          vault_attempts=$((vault_wait_min * 60 / 30))
+          [[ "$vault_attempts" -ge 1 ]] || vault_attempts=1
+          purged=0
+          vault_checked=0
+          for attempt in $(seq 1 "$vault_attempts"); do
+            vault_checked=1
+            if ! deleted_vaults=$(az keyvault list-deleted --query "[?name=='$VAULT_NAME'].name" -o tsv); then
+              echo "::error::Failed to list soft-deleted Key Vaults; cannot settle the state of $VAULT_NAME."
+              status=1
+              break
+            fi
+            if printf '%s\n' "$deleted_vaults" | grep -q "$VAULT_NAME"; then
+              echo "Key Vault $VAULT_NAME is soft-deleted; purging it."
+              if az keyvault purge --name "$VAULT_NAME"; then
+                purged=1
+                echo "Key Vault $VAULT_NAME purged."
+              else
+                echo "::error::Failed to purge $VAULT_NAME; the next same-name deploy will be blocked."
+                status=1
+              fi
+              break
+            fi
+            if [[ "$attempt" -lt "$vault_attempts" ]]; then
+              echo "Vault check $attempt/$vault_attempts: $VAULT_NAME is not soft-deleted yet, retrying in 30s..."
+              sleep 30
+            fi
+          done
+          if [[ "$purged" -eq 0 && "$vault_checked" -eq 1 && "$status" -eq 0 ]]; then
+            echo "Key Vault $VAULT_NAME is not soft-deleted; nothing to purge."
           fi
 
           exit "$status"

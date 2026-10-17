@@ -128,10 +128,16 @@ _join_quoted() {
   printf '%s' "$out"
 }
 
+# log_cmd [args...]: echo the command to stderr and record it in the commands
+# log. Set TRACE_COMMANDS=0 to silence the console trace — the log file, if
+# any, still records it. Used by `check-state.sh --rg`, whose output is read by
+# a CI step where a wall of `+ az ...` lines is pure noise.
 log_cmd() {
   local cmd
   cmd=$(_join_quoted "$@")
-  printf '+ %s\n' "$cmd" >&2
+  if [[ "${TRACE_COMMANDS:-1}" != "0" ]]; then
+    printf '+ %s\n' "$cmd" >&2
+  fi
   if [[ -n "${COMMAND_LOG:-}" ]]; then
     printf '+ %s\n' "$cmd" >> "$COMMAND_LOG"
   fi

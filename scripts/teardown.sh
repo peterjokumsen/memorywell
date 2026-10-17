@@ -10,6 +10,7 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/common.sh"
 #   --purge-vault  after deleting the RG, wait for the soft-deleted Key Vault
 #                  to appear and purge it so same-name redeploys do not conflict.
 #                  Without the flag, only the RG delete runs (fast, async).
+#                  VAULT_PURGE_WAIT_MINUTES (default 10) caps that wait.
 #   --shared       also delete the shared resource group (ACR). Not the default:
 #                  the shared RG survives study-session teardowns, and deleting
 #                  it first would break image pulls from any running app.
@@ -59,39 +60,57 @@ fi
 # Key Vault uses soft-delete: after the RG is gone the vault lingers in
 # "deleted" state and blocks same-name redeploy. Purge is opt-in via
 # --purge-vault because the RG delete is async (--no-wait) and the vault may
-# take minutes to reach soft-deleted state. When the vault is neither live
-# nor soft-deleted (e.g. a repeat run after it was already purged), there is
-# nothing to wait for — skip instead of timing out.
-if [[ "$PURGE_VAULT" == "1" ]]; then
-  if ! vault_is_soft_deleted && ! vault_is_live; then
-    info "Key Vault $VAULT_NAME not found (neither live nor soft-deleted); skipping purge."
-  else
-    if ! vault_is_soft_deleted; then
-      step "Waiting for soft-deleted Key Vault $VAULT_NAME (up to ~5 min)..."
-      # Grouped so the ~30 probes collapse into one section in the nightly
-      # GitHub Actions log. Group the block only at top level, never around a
-      # $(...) capture, and always close it — an unclosed group swallows the
-      # rest of the step's output.
-      group "Waiting for $VAULT_NAME to become soft-deleted"
-      attempt=1
-      max_attempts=30
-      while ! vault_is_soft_deleted; do
-        if [[ "$attempt" -ge "$max_attempts" ]]; then
-          endgroup
-          error "Vault $VAULT_NAME not soft-deleted yet; purge skipped. Retry later:"
-          error "  az keyvault list-deleted --query \"[?name=='$VAULT_NAME']\" -o table"
-          error "  az keyvault purge --name \"$VAULT_NAME\""
-          exit 1
-        fi
-        warn "Attempt $attempt/$max_attempts: not soft-deleted yet, retrying in 10s..."
-        sleep 10
-        attempt=$((attempt + 1))
-      done
+# take minutes to reach soft-deleted state.
+#
+# The race this has to survive: right after `az group delete --no-wait`, the
+# vault is in a transient state where `az keyvault show` fails (the resource is
+# being deleted) but `list-deleted` does not list it yet. Concluding "no vault,
+# nothing to purge" there is wrong — minutes later the vault does surface as
+# soft-deleted, which is exactly what the workflow's Verify step then trips
+# over. So: when this run deleted the group, wait for the vault to surface
+# instead of deciding early. Only when there was no group to delete can a
+# missing vault mean "already purged in an earlier run".
+wait_for_soft_deleted_vault() {
+  local attempt=1
+  local wait_minutes="${VAULT_PURGE_WAIT_MINUTES:-10}"
+  local max_attempts=$((wait_minutes * 60 / 10))
+  step "Waiting for soft-deleted Key Vault $VAULT_NAME (up to ~${wait_minutes} min)..."
+  # Grouped so the probes collapse into one section in the nightly GitHub
+  # Actions log. Group the block only at top level, never around a $(...)
+  # capture, and always close it — an unclosed group swallows the rest of the
+  # step's output.
+  group "Waiting for $VAULT_NAME to become soft-deleted"
+  while ! vault_is_soft_deleted; do
+    if [[ "$attempt" -ge "$max_attempts" ]]; then
       endgroup
+      error "Vault $VAULT_NAME did not become soft-deleted within ${wait_minutes} min; purge skipped. Retry later:"
+      error "  az keyvault purge --name \"$VAULT_NAME\""
+      return 1
     fi
+    warn "Attempt $attempt/$max_attempts: not soft-deleted yet, retrying in 10s..."
+    sleep 10
+    attempt=$((attempt + 1))
+  done
+  endgroup
+}
+
+if [[ "$PURGE_VAULT" == "1" ]]; then
+  if [[ "$ENV_RG_EXISTS" == "true" ]]; then
+    # This run deleted the group, so the vault's fate is still being decided.
+    if wait_for_soft_deleted_vault; then
+      step "Purging soft-deleted Key Vault $VAULT_NAME..."
+      run az keyvault purge --name "$VAULT_NAME"
+      info "Environment resource group deleted, vault purged."
+    else
+      exit 1
+    fi
+  elif vault_is_soft_deleted; then
+    # Nothing to delete, but a previous run left the vault soft-deleted.
     step "Purging soft-deleted Key Vault $VAULT_NAME..."
     run az keyvault purge --name "$VAULT_NAME"
-    info "Environment resource group deleted, vault purged."
+    info "Key Vault $VAULT_NAME purged."
+  else
+    info "No resource group to delete and $VAULT_NAME is neither live nor soft-deleted; assuming it was already purged."
   fi
 else
   info "Skipping Key Vault purge (pass --purge-vault to purge $VAULT_NAME for same-name redeploy)."
