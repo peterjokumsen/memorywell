@@ -159,3 +159,17 @@ jobs:
         run: |
           set -euo pipefail
           shellcheck --severity=warning scripts/*.sh
+
+      # scripts/_log.sh picks one of two interchangeable logging backends at
+      # source time. A printer that exists in only one of them type-checks fine
+      # and then blows up at run time on the other platform, so the two
+      # `name() {` definition lists must stay identical. Private helpers
+      # (_gh_*) are deliberately excluded: they are backend-internal.
+      - name: Logging backends define the same functions
+        run: |
+          set -euo pipefail
+          fns() { grep -oE '^[a-z][a-z0-9_]*\(\)' "$1" | sort -u; }
+          if ! diff <(fns scripts/_log-local.sh) <(fns scripts/_log-ghactions.sh); then
+            echo "::error::scripts/_log-local.sh and scripts/_log-ghactions.sh define different functions."
+            exit 1
+          fi
