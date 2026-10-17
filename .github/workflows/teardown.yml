@@ -153,10 +153,11 @@ jobs:
           ENVIRONMENT: ${{ steps.config.outputs.environment }}
           VAULT_NAME: ${{ steps.config.outputs.vault_name }}
           # The RG delete is async (teardown.sh uses --no-wait). Draining the
-          # managed environment alone routinely takes >5 min, so allow 30,
-          # checked every 10.
+          # managed environment alone routinely takes >5 min, so allow 30.
           RG_WAIT_TIMEOUT_MINUTES: "30"
-          RG_CHECK_INTERVAL_MINUTES: "10"
+          RG_POLL_SECONDS: "20"
+          # Every 10 min, alongside the poll, print what is left to drain.
+          RG_REPORT_INTERVAL_MINUTES: "10"
           # After the group is gone the vault can take a further few minutes to
           # surface as soft-deleted; purge it rather than failing the run.
           VAULT_SOFT_DELETE_WAIT_MINUTES: "10"
@@ -166,48 +167,64 @@ jobs:
           status=0
 
           timeout_min="${RG_WAIT_TIMEOUT_MINUTES:-30}"
-          interval_min="${RG_CHECK_INTERVAL_MINUTES:-10}"
-          max_checks=$((timeout_min / interval_min))
-          [[ "$max_checks" -ge 1 ]] || max_checks=1
+          poll_seconds="${RG_POLL_SECONDS:-20}"
+          max_attempts=$((timeout_min * 60 / poll_seconds))
+          [[ "$max_attempts" -ge 1 ]] || max_attempts=1
 
-          # Poll with check-state.sh --rg: it reports the group's provisioning
-          # state and its resources' states (so the drain in progress is
-          # visible), keeps the `+ az ...` traces off the console, and encodes
-          # the verdict in its exit code — 0 gone, 1 not Succeeded, 2 all
-          # Succeeded. Checked once up front, then every interval_min.
-          gone=0
-          for check in $(seq 0 "$max_checks"); do
-            echo "== check $check/$max_checks for $rg_name"
-            rc=0
+          # report_state: hand the group's current state to check-state.sh --rg,
+          # which prints the provisioning state and every resource's state. This
+          # is progress reporting only — the poll below decides when the group
+          # is gone, so a report that cannot be produced (usage error, a broken
+          # script, a flaky API) is a warning, never a failed run.
+          report_state() {
+            local rc=0
+            echo "--- state of $rg_name ---"
             ./scripts/check-state.sh --rg "$rg_name" || rc=$?
             case "$rc" in
-              0)
-                gone=1
-                echo "Resource group $rg_name is gone."
-                break
-                ;;
-              1)
-                echo "Resource group $rg_name still exists, with resources not Succeeded."
-                ;;
-              2)
-                echo "Resource group $rg_name still exists and everything in it is Succeeded."
-                ;;
+              0) echo "--- $rg_name is gone ---" ;;
+              1) echo "--- still draining: some resources are not Succeeded ---" ;;
+              2) echo "--- group exists, everything Succeeded ---" ;;
               *)
-                # Not a verdict: a usage error (64) or a crash. Do not keep
-                # polling for 30 minutes on a broken script.
-                echo "::error::check-state.sh --rg exited with $rc; cannot tell whether $rg_name is gone."
-                status=1
-                break
+                echo "::warning::check-state.sh --rg exited with $rc; no state report this time."
                 ;;
             esac
-            [[ "$check" -lt "$max_checks" ]] || break
-            echo "Sleeping ${interval_min} min before the next check..."
-            sleep $((interval_min * 60))
+          }
+
+          # The poll is the detector: `az group show` every 20s, up to the
+          # timeout. Every RG_REPORT_INTERVAL_MINUTES (and once up front) the
+          # state report is printed too, so a long drain shows what it is
+          # waiting on instead of just "still exists".
+          report_minutes="${RG_REPORT_INTERVAL_MINUTES:-10}"
+          report_every=$((report_minutes * 60 / poll_seconds))
+          [[ "$report_every" -ge 1 ]] || report_every=1
+          next_report=1
+          gone=0
+          attempt=1
+          while true; do
+            if ! az group show --name "$rg_name" >/dev/null 2>&1; then
+              echo "Check $attempt/$max_attempts: resource group $rg_name is gone."
+              gone=1
+              break
+            fi
+            if (( attempt >= next_report )); then
+              report_state
+              next_report=$((attempt + report_every))
+            fi
+            remaining=$(((max_attempts - attempt) * poll_seconds / 60))
+            if (( attempt % 5 == 0 )); then
+              echo "Check $attempt/$max_attempts: $rg_name still exists (~${remaining} min left in budget)."
+            fi
+            if (( attempt >= max_attempts )); then
+              echo "::error::Resource group $rg_name still exists after ${timeout_min} min."
+              status=1
+              break
+            fi
+            sleep "$poll_seconds"
+            attempt=$((attempt + 1))
           done
 
-          if [[ "$gone" -eq 0 ]]; then
-            echo "::error::Resource group $rg_name still exists after ${timeout_min} min."
-            status=1
+          if [[ "$gone" -eq 0 && "$status" -eq 0 ]]; then
+            echo "::error::Resource group $rg_name check loop exited unexpectedly."
           fi
 
           # A soft-deleted Key Vault blocks the next same-name deploy, but it
