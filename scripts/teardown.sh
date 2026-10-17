@@ -68,10 +68,16 @@ if [[ "$PURGE_VAULT" == "1" ]]; then
   else
     if ! vault_is_soft_deleted; then
       step "Waiting for soft-deleted Key Vault $VAULT_NAME (up to ~5 min)..."
+      # Grouped so the ~30 probes collapse into one section in the nightly
+      # GitHub Actions log. Group the block only at top level, never around a
+      # $(...) capture, and always close it — an unclosed group swallows the
+      # rest of the step's output.
+      group "Waiting for $VAULT_NAME to become soft-deleted"
       attempt=1
       max_attempts=30
       while ! vault_is_soft_deleted; do
         if [[ "$attempt" -ge "$max_attempts" ]]; then
+          endgroup
           error "Vault $VAULT_NAME not soft-deleted yet; purge skipped. Retry later:"
           error "  az keyvault list-deleted --query \"[?name=='$VAULT_NAME']\" -o table"
           error "  az keyvault purge --name \"$VAULT_NAME\""
@@ -81,6 +87,7 @@ if [[ "$PURGE_VAULT" == "1" ]]; then
         sleep 10
         attempt=$((attempt + 1))
       done
+      endgroup
     fi
     step "Purging soft-deleted Key Vault $VAULT_NAME..."
     run az keyvault purge --name "$VAULT_NAME"

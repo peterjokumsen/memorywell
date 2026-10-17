@@ -1,24 +1,17 @@
 # shellcheck shell=bash
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
-# Color helpers: auto-disabled when output is not a TTY or NO_COLOR is set,
-# so piped/logged output stays plain. Use step/info/success/warn for stdout
-# messaging; error goes to stderr. Never use these inside $(...) captures.
-if [[ -t 1 && -z "${NO_COLOR:-}" ]]; then
-  C_RESET=$'\e[0m'; C_BLUE=$'\e[34m'; C_GREEN=$'\e[32m'
-  C_YELLOW=$'\e[33m'; C_RED=$'\e[31m'; C_CYAN=$'\e[36m'
-else
-  C_RESET=''; C_BLUE=''; C_GREEN=''; C_YELLOW=''; C_RED=''; C_CYAN=''
-fi
-step()    { printf '%b==>%b %s\n' "$C_BLUE" "$C_RESET" "$*"; }
-info()    { printf '%b%s%b\n' "$C_CYAN" "$*" "$C_RESET"; }
-success() { printf '%b%s%b\n' "$C_GREEN" "$*" "$C_RESET"; }
-warn()    { printf '%b%s%b\n' "$C_YELLOW" "$*" "$C_RESET"; }
-error()   { printf '%b%s%b\n' "$C_RED" "$*" "$C_RESET" >&2; }
+# Logging backend (colour locally, GitHub Actions workflow commands in CI):
+# defines step/info/success/warn/error/debug/group/endgroup. Override the pick
+# with LOG_FORMAT=local|github. Both backends keep chatter off stdout, so
+# `X="$(some_helper)"` captures stay data-only. Never call these inside a
+# $(...) capture in the local backend either: info/step/success go to stdout
+# there, and would be captured along with the result.
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/log.sh"
 
 if [[ -f "$ROOT/.env" ]]; then
   set -o allexport; source "$ROOT/.env"; set +o allexport
-  info "Loaded .env" >&2
+  debug "Loaded .env"
 fi
 
 : "${BASE_NAME:?set BASE_NAME in .env}"
@@ -95,8 +88,9 @@ image_tag() {
 log_vars() {
   # Two passes so the values align: first find the widest "key:", then print.
   # (A fixed width breaks as soon as a longer key like "Shared resource group"
-  # shows up.)
-  local width=0 kvp key
+  # shows up.) Lines go through `info` rather than a bare printf so the GitHub
+  # backend turns each one into a notice instead of invisible plain output.
+  local width=0 kvp key line
   for kvp in "$@"; do
     key="${kvp%%=*}:"
     if (( ${#key} > width )); then
@@ -104,7 +98,8 @@ log_vars() {
     fi
   done
   for kvp in "$@"; do
-    printf '  %-*s %s\n' "$width" "${kvp%%=*}:" "${kvp#*=}"
+    printf -v line '  %-*s %s' "$width" "${kvp%%=*}:" "${kvp#*=}"
+    info "$line"
   done
 }
 
@@ -124,7 +119,7 @@ init_command_log() {
   mkdir -p "$ROOT/logs"
   COMMAND_LOG="$ROOT/logs/${name}-$(date -u +%Y%m%d-%H%M%S).log"
   export COMMAND_LOG
-  info "Command log: $COMMAND_LOG" >&2
+  debug "Command log: $COMMAND_LOG"
 }
 
 # _join_quoted: shell-quote each arg (%q) so the logged line is copy-pasteable.
@@ -176,6 +171,9 @@ run_quiet() {
 # Fails (after dumping properties.outputs) when the outputs never fill in.
 # Capture with:
 #   OUT="$(fetch_deployment_outputs "$NAME" "<query>" 2)" || exit 1
+# No group/endgroup around the retry loop, and no redirection tricks: both
+# backends already keep chatter off stdout (see log-ghactions.sh), so the
+# capture below picks up only the tab-separated result.
 fetch_deployment_outputs() {
   local deployment_name="${1:?usage: fetch_deployment_outputs <deployment-name> <query> <expected-fields> [max-attempts [delay-secs]]}"
   local query="${2:?usage: fetch_deployment_outputs <deployment-name> <query> <expected-fields> [max-attempts [delay-secs]]}"
@@ -220,7 +218,7 @@ fetch_deployment_outputs() {
         --query properties.outputs -o json || true
       return 1
     fi
-    warn "Attempt $attempt/$max_attempts: outputs not yet available, retrying in ${delay}s..." >&2
+    warn "Attempt $attempt/$max_attempts: outputs not yet available, retrying in ${delay}s..."
     sleep "$delay"
     attempt=$((attempt + 1))
   done

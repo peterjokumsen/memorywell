@@ -187,7 +187,8 @@ slow — recreate it with `./scripts/deploy-shared.sh`.
 2. Run again with `dry_run: false`. Expect the RG delete, the vault purge
    (waiting; the **Verify** step allows up to 30 min for the managed
    environment to drain, logging progress every few checks), and a green
-   **Verify** step.
+   **Verify** step. Script messages arrive as Actions annotations, and the
+   vault wait sits inside a collapsible group — expand it only when it fails.
 3. Confirm in the portal that `rg-memwell-dev` is gone and
    `rg-memwell-shared` still exists.
 4. Confirm the next `./scripts/deploy.sh` succeeds — that is the real proof the
@@ -220,4 +221,5 @@ slow — recreate it with `./scripts/deploy-shared.sh`.
 
 - `scripts/teardown.sh` — the script this workflow calls (flags: `--purge-vault`, `--shared`)
 - `scripts/common.sh` — naming rules (`rg-<base>-<env>`, `kv-<base>-<env>`, `rg-<base>-shared`); these are the single source of truth, since `infra/main.bicepparam` reads the exported `VAULT_NAME`/`RG_NAME`/`SHARED_RG_NAME` env vars rather than rebuilding names itself
+- `scripts/log.sh` + `scripts/log-local.sh` / `scripts/log-ghactions.sh` — the script loggers. Under Actions (`GITHUB_ACTIONS=true`) the GitHub backend is picked automatically and `warn`/`error` become annotations, `step`/`info`/`success` notices, and retry loops sit inside collapsible `group`/`endgroup` sections. Both backends print to stderr, so nothing lands in the `$(...)` captures the scripts rely on. Force one locally with `LOG_FORMAT=github ./scripts/teardown.sh` to preview CI output, or `LOG_FORMAT=local` to override the automatic pick
 - `docs/PLAN.md` § Cost & safety — the cost model this workflow protects

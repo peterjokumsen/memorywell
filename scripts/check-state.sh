@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Check provisioning state of every resource deployed by the Bicep templates.
 # Read-only: runs every probe first (each `step`/`+` line goes to stderr), then
-# presents one consolidated report on stdout using the standard step/info/
-# success/warn/error helpers, colour-coded per state. Exits 0 when everything is
+# presents one consolidated report using the standard step/info/success/warn/
+# error helpers, colour-coded per state — plain text locally, GitHub Actions
+# workflow commands under CI (see common.sh). Exits 0 when everything is
 # Succeeded (or nothing is deployed yet), 1 when anything is missing a
 # Succeeded state.
 set -euo pipefail
@@ -84,6 +85,10 @@ check_group() {
   local label="$2"
   local rg_state entries id name state bad=0
 
+  # Grouped so the per-resource `az resource show` probe storm collapses into
+  # one section in CI. Every exit path below closes the group first, and the
+  # calls stay at top level: an unclosed group swallows the rest of the step.
+  group "Collecting state for $rg ($label)"
   step "Checking resource group $rg ($label)..."
   if rg_state=$(run_hide_stderr az group show --name "$rg" --query properties.provisioningState -o tsv); then
     [[ "$rg_state" == "Succeeded" ]] || OVERALL=1
@@ -91,6 +96,7 @@ check_group() {
     GROUP_RG_STATE[$label]="absent"
     GROUP_RES_TEXT[$label]=""
     GROUP_DEP_TEXT[$label]=""
+    endgroup
     return 0
   fi
   GROUP_RG_STATE[$label]="$rg_state"
@@ -142,6 +148,7 @@ check_group() {
     OVERALL=1
     GROUP_DEP_TEXT[$label]="could not list deployments in $rg"
   fi
+  endgroup
 }
 
 # fetch_sub_deployments <name-prefix>: stores the latest 3 subscription
@@ -267,6 +274,10 @@ fi
 success "Information collection completed."
 echo ""
 step "Report"
+# The per-resource report lines are long and only interesting when something is
+# wrong, so the whole phase is one collapsible section in CI. The summary below
+# stays outside it and must remain the last thing printed.
+group "Report"
 log_vars \
   "Subscription=$(subscription_name) ($SUBSCRIPTION_ID)" \
   "Scope=$([[ "$CHECK_ENV" == "1" && "$CHECK_SHARED" == "1" ]] && echo 'environment + shared' || ([[ "$CHECK_ENV" == "1" ]] && echo 'environment only' || echo 'shared only'))"
@@ -286,6 +297,7 @@ fi
 if [[ "$CHECK_SHARED" == "1" ]]; then
   report_sub_deployments "shared" "$SHARED_SUB_ROWS" "$SHARED_SUB_OK"
 fi
+endgroup
 
 step "Summary"
 if [[ "$OVERALL" == "0" ]]; then
