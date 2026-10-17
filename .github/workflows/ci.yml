@@ -103,21 +103,14 @@ jobs:
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
           bicep --version
 
+      # The build itself lives in scripts/validate-bicep.sh, so local and CI
+      # validate identically: it compiles every infra/**/*.bicep (and
+      # *.bicepparam, which CI previously did not cover) with `--stdout`, so no
+      # .json lands next to the sources, and fails with one annotation per bad
+      # file. On the runner there is no `az`, so the script falls back to the
+      # standalone binary installed above.
       - name: Build every bicep file
-        run: |
-          set -euo pipefail
-          rc=0
-          while IFS= read -r file; do
-            echo "::group::bicep build $file"
-            if bicep build "$file" --stdout >/dev/null; then
-              echo "ok"
-            else
-              echo "::error::bicep build failed for $file"
-              rc=1
-            fi
-            echo "::endgroup::"
-          done < <(find infra -name '*.bicep' | sort)
-          exit "$rc"
+        run: ./scripts/validate-bicep.sh
 
       # Matches the bicep-format local hook in .pre-commit-config.yaml: Space
       # indent, size 2, final newline. Formats a copy of the whole tree so
