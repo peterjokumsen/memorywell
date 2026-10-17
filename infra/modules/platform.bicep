@@ -6,6 +6,7 @@ param inputs ResourceGroupInputs
 param acrLoginServer string
 param identityId string
 param identityPrincipalId string
+param keyVaultName string
 
 module monitoring 'monitor.bicep' = {
   name: '${deployment().name}-monitoring'
@@ -19,6 +20,7 @@ module keyVault 'vault.bicep' = {
   params: {
     inputs: inputs
     identityPrincipalId: identityPrincipalId
+    keyVaultName: keyVaultName
   }
 }
 

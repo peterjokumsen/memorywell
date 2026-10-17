@@ -10,6 +10,7 @@ param resourceGroupName string
 param containerImage string
 param sharedResourceGroupName string
 param acrName string
+param keyVaultName string
 
 var globalInputs GlobalInputs = {
   location: location
@@ -76,6 +77,7 @@ module platform './modules/platform.bicep' = {
     acrLoginServer: acr.properties.loginServer
     identityId: identity.outputs.id
     identityPrincipalId: identity.outputs.principalId
+    keyVaultName: keyVaultName
   }
   // No output links platform to acrPull, so order it explicitly: the app must
   // not start pulling before the role assignment exists.

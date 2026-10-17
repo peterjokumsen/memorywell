@@ -83,21 +83,35 @@ step "Checking if image exists in ACR..."
 # teardown). Fall back to the helloworld image in that case — the real image is
 # pushed by `az acr build` below (set -e does not trigger inside `if`).
 if run_hide_stderr az acr repository show-tags -n "$(registry_name)" --repository api | grep -q "$ENVIRONMENT"; then
-  success "Image api:$ENVIRONMENT exists in ACR, using it for deployment."
+  success "  Image api:$ENVIRONMENT exists in ACR, using it for deployment."
   IMAGE="$(login_server)/api:$ENVIRONMENT"
 else
-  warn "api:$ENVIRONMENT tag not found in $(registry_name), using default image for deployment."
+  warn "  api:$ENVIRONMENT tag not found in $(registry_name), using default image for deployment."
   IMAGE="mcr.microsoft.com/azuredocs/containerapps-helloworld:latest"
 fi
 export IMAGE
 
+step "Checking if key vault is soft-deleted"
+if vault_is_soft_deleted; then
+  error "Key Vault $VAULT_NAME is soft-deleted (name reserved, ~90 days)."
+  error "Purge it (fresh vault, study-stack default):"
+  error "  az keyvault purge --name \"$VAULT_NAME\" --location \"$LOCATION\""
+  error "Or restore it with its old secrets:"
+  error "  az keyvault recover --name \"$VAULT_NAME\" --location \"$LOCATION\""
+  exit 1
+else
+  success "  Key Vault $VAULT_NAME is not soft-deleted."
+fi
+
 # Deploy the Bicep template to create the resource group and other resources
+step "Starting $ACTION for $RG_NAME"
 log_vars \
   "Action=$ACTION" \
-  "Subscription=$SUBSCRIPTION_ID" \
+  "Subscription=$(subscription_name) ($SUBSCRIPTION_ID)" \
   "Resource group=$RG_NAME" \
   "RG state=${RG_STATE:-absent}" \
   "Shared resource group=$SHARED_RG_NAME" \
+  "KeyVault=$VAULT_NAME" \
   "Location=$LOCATION" \
   "Deployment=$DEPLOYMENT_NAME" \
   "ImageTag=$IMAGE_TAG"
@@ -134,7 +148,7 @@ step "Building and pushing Docker image to ACR..."
 # Push both the floating env tag (keeps the Bicep pre-check working and marks
 # latest-stable) and the unique timestamp tag (guarantees a template-string
 # change so `containerapp update` mints a new revision every run).
-run az acr build -r "$REGISTRY" -t api:$ENVIRONMENT -t api:$IMAGE_TAG "$ROOT/api"
+run az acr build -r "$REGISTRY" -t api:"$ENVIRONMENT" -t api:"$IMAGE_TAG" "$ROOT/api"
 
 step "Deploying container app..."
 run az containerapp update \
