@@ -16,9 +16,10 @@
 #
 # Compiler: `az bicep` when the Azure CLI is on PATH (the local case, and the
 # one that keeps the bicep version in step with `az bicep format` in the
-# pre-commit hook), otherwise the standalone `bicep` binary — which is what CI
-# installs, deliberately: the azure/CLI action runs in a container and is the
-# wrong shape for a build-only check. Override with BICEP_MODE=az|bicep.
+# pre-commit hook), otherwise the standalone `bicep` binary. Note that
+# GitHub-hosted runners *do* have `az`, so CI pins BICEP_MODE=bicep to use the
+# version it installed rather than whatever the CLI bundles. Override with
+# BICEP_MODE=az|bicep.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

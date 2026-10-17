@@ -107,9 +107,16 @@ jobs:
       # validate identically: it compiles every infra/**/*.bicep (and
       # *.bicepparam, which CI previously did not cover) with `--stdout`, so no
       # .json lands next to the sources, and fails with one annotation per bad
-      # file. On the runner there is no `az`, so the script falls back to the
-      # standalone binary installed above.
+      # file.
+      #
+      # BICEP_MODE=bicep is deliberate: the script prefers `az bicep`, and
+      # GitHub-hosted runners do have `az` — but its bundled Bicep version moves
+      # under us, while the version pinned above is what the local
+      # bicep-format hook is kept in step with. Pin it here; the format check
+      # below uses the same binary.
       - name: Build every bicep file
+        env:
+          BICEP_MODE: bicep
         run: ./scripts/validate-bicep.sh
 
       # Matches the bicep-format local hook in .pre-commit-config.yaml: Space
