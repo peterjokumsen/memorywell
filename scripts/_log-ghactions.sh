@@ -19,6 +19,7 @@
 #
 # Two parser rules to respect: the command ends at the first unescaped newline
 # or `\r`, and `%` starts an escape sequence, so both are percent-encoded here.
+# Every line goes through _log_stderr, which also appends it to the stderr log.
 
 # _gh_escape_data <text>: escape a workflow command's message payload.
 _gh_escape_data() {
@@ -42,15 +43,16 @@ _gh_escape_prop() {
 }
 
 # GitHub has no "success" annotation level: every non-error, non-warning level
-# (step/info/success/debug) is a notice, colourised by the UI itself.
-step()    { printf '::notice::%s\n' "$(_gh_escape_data "$*")" >&2; }
-info()    { printf '::notice::%s\n' "$(_gh_escape_data "$*")" >&2; }
-success() { printf '::notice::%s\n' "$(_gh_escape_data "$*")" >&2; }
-warn()    { printf '::warning::%s\n' "$(_gh_escape_data "$*")" >&2; }
-error()   { printf '::error::%s\n' "$(_gh_escape_data "$*")" >&2; }
+# (step/info/success/debug) is a notice, colourised by the UI itself. All of
+# them go to stderr, matching the local backend's level-to-stream split.
+step()    { _log_stderr "::notice::$(_gh_escape_data "$*")"; }
+info()    { _log_stderr "::notice::$(_gh_escape_data "$*")"; }
+success() { _log_stderr "::notice::$(_gh_escape_data "$*")"; }
+warn()    { _log_stderr "::warning::$(_gh_escape_data "$*")"; }
+error()   { _log_stderr "::error::$(_gh_escape_data "$*")"; }
 # Only visible when step debug logging is on (ACTIONS_STEP_DEBUG / the
 # "Enable debug logging" workflow setting).
-debug()   { printf '::debug::%s\n' "$(_gh_escape_data "$*")" >&2; }
+debug()   { _log_stderr "::debug::$(_gh_escape_data "$*")"; }
 
-group()    { printf '::group::%s\n' "$(_gh_escape_data "$*")" >&2; }
-endgroup() { printf '%s\n' '::endgroup::' >&2; }
+group()    { _log_stderr "::group::$(_gh_escape_data "$*")"; }
+endgroup() { _log_stderr '::endgroup::'; }
