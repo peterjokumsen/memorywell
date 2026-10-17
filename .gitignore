@@ -224,6 +224,9 @@ web/build/
 
 # Bicep compiled output (local build artifact, never commit)
 infra/**/*.json
+# Where scripts/validate-bicep.sh writes the compiled JSON. `build/` already
+# matches this, repeated here so the intent is next to the bicep rules.
+build/bicep/
 
 # Script command logs (local run history, never commit)
 logs/

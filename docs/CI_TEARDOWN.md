@@ -184,14 +184,23 @@ slow — recreate it with `./scripts/deploy-shared.sh`.
 1. Trigger **Actions → scheduled-teardown → Run workflow** with `dry_run: true`.
    The log should print `rg-memwell-dev`, `kv-memwell-dev` and the shared
    decision, and touch nothing in Azure.
-2. Run again with `dry_run: false`. Expect the RG delete, the vault purge
-   (waiting; the **Verify** step allows up to 30 min for the managed
-   environment to drain, logging progress every few checks), and a green
-   **Verify** step. Script messages arrive as Actions annotations, and the
-   vault wait sits inside a collapsible group — expand it only when it fails.
-3. Confirm in the portal that `rg-memwell-dev` is gone and
+2. Run again with `dry_run: false`. Expect the RG delete, then a **Verify**
+   step that polls `az group show` every 20 s for up to 30 min until the group
+   is gone. Once up front and then every 10 min it also prints
+   `check-state.sh --rg rg-memwell-dev` — the group's provisioning state and its
+   resources' states — so a long drain shows _what_ it is waiting on rather
+   than just "still exists". That report is informational: if it cannot be
+   produced, the run logs a warning and the poll carries on. Only `step` lines
+   are annotated; the vault wait sits inside a collapsible group — expand it
+   only when it fails.
+3. The vault is settled in two places, because it only becomes visible as
+   soft-deleted _after_ the group is gone: `teardown.sh` waits up to 5 min for
+   it and purges it, and **Verify** waits up to 5 more and purges it if it
+   turned up in the meantime. A purge there is success, not failure — the next
+   deploy needs the name free.
+4. Confirm in the portal that `rg-memwell-dev` is gone and
    `rg-memwell-shared` still exists.
-4. Confirm the next `./scripts/deploy.sh` succeeds — that is the real proof the
+5. Confirm the next `./scripts/deploy.sh` succeeds — that is the real proof the
    vault was purged (an un-purged vault blocks the same name).
 
 ## 4. Pausing / operating
@@ -208,20 +217,21 @@ slow — recreate it with `./scripts/deploy-shared.sh`.
 
 ## 5. Troubleshooting
 
-| Symptom                                              | Cause / fix                                                                                               |
-| ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| `AADSTS70021: No matching federated identity record` | Federated-credential `subject` does not match `repo:<owner>/<repo>:environment:azure`                     |
-| `AuthorizationFailed` on `az group delete`           | Role assignment missing or not yet propagated (~5 min). Re-check with the verify command in 1.2           |
-| `Forbidden` on `az keyvault purge`                   | Add **Owner** at subscription scope (see 1.2)                                                             |
-| Verify step: `still soft-deleted`                    | Purge raced the RG delete. Purge manually: `az keyvault purge --name kv-memwell-dev`                      |
-| Job silently did nothing                             | Nightly schedule disabled (60-day inactivity) or workflow disabled in the Actions tab                     |
-| `set: LOCATION: parameter null` style script errors  | `scripts/common.sh` requires `BASE_NAME`/`LOCATION`/`SUBSCRIPTION_ID`; confirm the GitHub variables exist |
+| Symptom                                              | Cause / fix                                                                                                                                            |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `AADSTS70021: No matching federated identity record` | Federated-credential `subject` does not match `repo:<owner>/<repo>:environment:azure`                                                                  |
+| `AuthorizationFailed` on `az group delete`           | Role assignment missing or not yet propagated (~5 min). Re-check with the verify command in 1.2                                                        |
+| `Forbidden` on `az keyvault purge`                   | Add **Owner** at subscription scope (see 1.2)                                                                                                          |
+| Verify step: `still soft-deleted`                    | Now auto-purged; a leftover usually means the purge was refused. Check the step output, then purge manually: `az keyvault purge --name kv-memwell-dev` |
+| Job silently did nothing                             | Nightly schedule disabled (60-day inactivity) or workflow disabled in the Actions tab                                                                  |
+| `set: LOCATION: parameter null` style script errors  | `scripts/common.sh` requires `BASE_NAME`/`LOCATION`/`SUBSCRIPTION_ID`; confirm the GitHub variables exist                                              |
 
 ## 6. Related
 
 - `scripts/teardown.sh` — the script this workflow calls (flags: `--purge-vault`, `--shared`)
 - `scripts/common.sh` — naming rules (`rg-<base>-<env>`, `kv-<base>-<env>`, `rg-<base>-shared`); these are the single source of truth, since `infra/main.bicepparam` reads the exported `VAULT_NAME`/`RG_NAME`/`SHARED_RG_NAME` env vars rather than rebuilding names itself
-- `scripts/_log.sh` + `scripts/_log-local.sh` / `scripts/_log-ghactions.sh` — the script loggers (sourced, not run). Under Actions (`GITHUB_ACTIONS=true`) the GitHub backend is picked automatically and `warn`/`error` become annotations, `step`/`info`/`success` notices, and retry loops sit inside collapsible `group`/`endgroup` sections. Both backends print to stderr, so nothing lands in the `$(...)` captures the scripts rely on. Force one locally with `LOG_FORMAT=github ./scripts/teardown.sh` to preview CI output, or `LOG_FORMAT=local` to override the automatic pick
+- `scripts/_log.sh` + `scripts/_log-local.sh` / `scripts/_log-ghactions.sh` — the script loggers (sourced, not run). Under Actions (`GITHUB_ACTIONS=true`) the GitHub backend is picked automatically: `step` becomes a `::notice::` milestone, `warn`/`error` become annotations, and retry loops sit inside collapsible `group`/`endgroup` sections, while `info`/`success` stay plain text (annotating routine progress buried the messages that matter). Both backends print to stderr, so nothing lands in the `$(...)` captures the scripts rely on. Force one locally with `LOG_FORMAT=github ./scripts/teardown.sh` to preview CI output, or `LOG_FORMAT=local` to override the automatic pick
 - `scripts/_azure.sh` — shared `az` helpers (`subscription_name`, `group_exists`, `fetch_deployment_outputs`, vault probes)
-- `logs/<script>-<timestamp>_{commands,stdout,stderr}.log` — written by `init_command_log`: the `+ az …` traces, every command's stdout, and every command's stderr, as three separate files (probes whose console output is hidden are still recorded). Not uploaded as an artifact, so read them locally after a run
+- `scripts/check-state.sh --rg <name>` — single-group report used by the **Verify** step for progress: the group's provisioning state and its resources' states, no command traces, no log files. Exit code carries the verdict (0 gone, 1 not Succeeded, 2 all Succeeded, 64 usage error). Useful on its own after a partial deploy: `./scripts/check-state.sh --rg rg-memwell-dev`
+- `logs/<script>-<timestamp>_{commands,stdout,stderr}.log` — written by `init_command_log`: the `+ az …` traces, command stdout, and command stderr, as three separate files. Probes whose console output is hidden are still recorded, and command output captured by `$(...)` lands here rather than on the console. The run uploads them as the `script-logs-<env>` artifact (`if: always()`, 7-day retention), so a failed run stays diagnosable after the runner is gone
 - `docs/PLAN.md` § Cost & safety — the cost model this workflow protects

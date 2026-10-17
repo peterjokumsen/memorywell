@@ -108,7 +108,10 @@ init_command_log() {
   STDOUT_LOG="$ROOT/logs/${name}-${stamp}_stdout.log"
   STDERR_LOG="$ROOT/logs/${name}-${stamp}_stderr.log"
   export COMMAND_LOG STDOUT_LOG STDERR_LOG
-  debug "Logs: $COMMAND_LOG | $STDOUT_LOG | $STDERR_LOG"
+  # `info`, not `debug`: under Actions a ::debug:: line is invisible unless the
+  # whole job runs with debug logging, so the run gave no hint that a transcript
+  # existed or where it was. The workflow uploads these paths as an artifact.
+  info "Logs: $COMMAND_LOG | $STDOUT_LOG | $STDERR_LOG"
 }
 
 # _join_quoted: shell-quote each arg (%q) so the logged line is copy-pasteable.
@@ -125,10 +128,16 @@ _join_quoted() {
   printf '%s' "$out"
 }
 
+# log_cmd [args...]: echo the command to stderr and record it in the commands
+# log. Set TRACE_COMMANDS=0 to silence the console trace — the log file, if
+# any, still records it. Used by `check-state.sh --rg`, whose output is read by
+# a CI step where a wall of `+ az ...` lines is pure noise.
 log_cmd() {
   local cmd
   cmd=$(_join_quoted "$@")
-  printf '+ %s\n' "$cmd" >&2
+  if [[ "${TRACE_COMMANDS:-1}" != "0" ]]; then
+    printf '+ %s\n' "$cmd" >&2
+  fi
   if [[ -n "${COMMAND_LOG:-}" ]]; then
     printf '+ %s\n' "$cmd" >> "$COMMAND_LOG"
   fi

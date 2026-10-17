@@ -6,36 +6,99 @@
 # workflow commands under CI (see common.sh). Exits 0 when everything is
 # Succeeded (or nothing is deployed yet), 1 when anything is missing a
 # Succeeded state.
+#
+#   ./scripts/check-state.sh                    full report, writes logs/
+#   ./scripts/check-state.sh --rg <name>        single-group report, no logs
+#
+# --rg mode exists for the teardown workflow's Verify step, which reports on
+# one resource group while it drains: it prints nothing but the group's
+# provisioning state and its resources' states, keeps the `+ az ...` traces off
+# the console (TRACE_COMMANDS=0) and writes no log files, and encodes the
+# answer in the exit code so the caller does not have to parse the report:
+#   0  group absent — gone, or never created
+#   1  present, but something is not Succeeded
+#   2  present and everything Succeeded
+#   64 usage error (never collides with a verdict)
 set -euo pipefail
 
 # prepare environment variables
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/common.sh"
 
-# Usage: check-state.sh [--env-only] [--shared-only]
+usage() {
+  cat <<EOF
+Usage: $0 [--env-only] [--shared-only] [--rg <resource-group>]
+
+  --env-only            check only rg-<base>-\$ENVIRONMENT
+  --shared-only         check only rg-<base>-shared
+  --rg <name>           report one resource group: its provisioning state and
+                        its resources' states, nothing else. No command traces,
+                        no log files; exit code 0=absent, 1=not Succeeded,
+                        2=all Succeeded (see the header comment).
+EOF
+}
+
+# Usage: check-state.sh [--env-only] [--shared-only] [--rg <name>]
 #   Default checks both resource groups. Flags limit the check to one side
 #   (e.g. --shared-only after deploy-shared.sh, --env-only after deploy.sh).
+#   --rg reports a single, named group instead (see usage above).
 if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
-  echo "Usage: $0 [--env-only] [--shared-only]"
+  usage
   exit 0
 fi
 CHECK_ENV=1
 CHECK_SHARED=1
-for arg in "$@"; do
+RG_ONLY=""
+while [[ $# -gt 0 ]]; do
+  arg="$1"
   case "$arg" in
     --env-only) CHECK_SHARED=0 ;;
     --shared-only) CHECK_ENV=0 ;;
+    --rg)
+      [[ $# -ge 2 ]] || {
+        error "--rg needs a resource group name"
+        usage >&2
+        exit 64 # EX_USAGE: never collide with the 0/1/2 verdict codes
+      }
+      RG_ONLY="$2"
+      shift
+      ;;
+    --rg=*) RG_ONLY="${arg#--rg=}" ;;
     *)
       error "Unknown argument: $arg"
-      echo "Usage: $0 [--env-only] [--shared-only]" >&2
-      exit 2
+      usage >&2
+      exit 64
       ;;
   esac
+  shift
 done
 
-init_command_log "check-state"
+# --rg= with nothing after it would otherwise fall through to the full report,
+# silently ignoring the flag.
+if [[ -n "${RG_ONLY+x}" && -z "$RG_ONLY" ]]; then
+  error "--rg needs a resource group name"
+  usage >&2
+  exit 64
+fi
+# --rg names the group, so the env/shared selectors would just be ignored:
+# say so rather than quietly dropping one of them.
+if [[ -n "$RG_ONLY" && ( "$CHECK_ENV" -eq 0 || "$CHECK_SHARED" -eq 0 ) ]]; then
+  error "--rg cannot be combined with --env-only or --shared-only"
+  usage >&2
+  exit 64
+fi
 
-step "Setting subscription..."
-run az account set --subscription "$SUBSCRIPTION_ID"
+# In --rg mode the report is the product, so the probes stay quiet: no command
+# traces, no command log. The subscription context still has to be explicit
+# (this script may run where `az account set` was never called), but its
+# narration is skipped. Both before the first `run` below.
+if [[ -n "$RG_ONLY" ]]; then
+  export TRACE_COMMANDS=0
+  run az account set --subscription "$SUBSCRIPTION_ID"
+else
+  init_command_log "check-state"
+  step "Setting subscription..."
+  run az account set --subscription "$SUBSCRIPTION_ID"
+fi
 
 OVERALL=0
 
@@ -67,11 +130,15 @@ declare -A GROUP_RG_STATE
 declare -A GROUP_RES_TEXT
 declare -A GROUP_DEP_TEXT
 
-# check_group <rg-name> <label>: collects the RG state, the per-resource
-# provisioningState (fetched individually with `az resource show`, since the
-# list embedding is not authoritative for every type) and the latest RG-scope
-# deployments. `az resource list` keeps this generic: new Bicep modules show up
-# with no script change. Resources without a provisioningState field (e.g. role
+# collect_group <rg-name> <label> [with-deployments=1]: collects the RG state,
+# the per-resource provisioningState (fetched individually with `az resource
+# show`, since the list embedding is not authoritative for every type) and —
+# unless with-deployments=0 — the latest RG-scope deployments into
+# GROUP_RG_STATE / GROUP_RES_TEXT / GROUP_DEP_TEXT, folding anything unhealthy
+# into OVERALL. It prints nothing: check_group narrates the probes, and `--rg`
+# mode reuses it silently.
+# `az resource list` keeps this generic: new Bicep modules show up with no
+# script change. Resources without a provisioningState field (e.g. role
 # assignments, managed identities) report n/a and are excluded from the health
 # check.
 #
@@ -80,28 +147,25 @@ declare -A GROUP_DEP_TEXT
 # managed environments all use it), while a handful of legacy/older types only
 # expose the top-level `provisioningState`. The fallback covers both in one call,
 # and still yields empty output — reported as n/a — when neither exists.
-check_group() {
+#
+# A group that `az group show` cannot resolve is recorded as "absent", never as
+# a failure: the same call fails both for "no such group" and for a genuine
+# API/auth problem, and the teardown poll needs "gone" to read as success. A
+# caller that must tell those apart has to ask `az group list` itself.
+collect_group() {
   local rg="$1"
   local label="$2"
+  local with_deployments="${3:-1}"
   local rg_state entries id name state bad=0
 
-  # Grouped so the per-resource `az resource show` probe storm collapses into
-  # one section in CI. Every exit path below closes the group first, and the
-  # calls stay at top level: an unclosed group swallows the rest of the step.
-  group "Collecting state for $rg ($label)"
-  step "Checking resource group $rg ($label)..."
-  if rg_state=$(run_hide_stderr az group show --name "$rg" --query properties.provisioningState -o tsv); then
-    [[ "$rg_state" == "Succeeded" ]] || OVERALL=1
-  else
+  if ! rg_state=$(run_hide_stderr az group show --name "$rg" --query properties.provisioningState -o tsv); then
     GROUP_RG_STATE[$label]="absent"
     GROUP_RES_TEXT[$label]=""
     GROUP_DEP_TEXT[$label]=""
-    endgroup
     return 0
   fi
   GROUP_RG_STATE[$label]="$rg_state"
 
-  step "Fetching resource states in $rg ($label)..."
   if ! entries=$(run az resource list --resource-group "$rg" --query "sort_by(@, &name)[].{n:name, i:id}" -o tsv); then
     OVERALL=1
     GROUP_RES_TEXT[$label]="could not list resources in $rg"
@@ -124,11 +188,17 @@ check_group() {
         bad=1
       fi
     done <<< "$entries"
-    [[ "$bad" == "0" ]] || OVERALL=1
+    [[ "$bad" -eq 0 ]] || OVERALL=1
     GROUP_RES_TEXT[$label]="$res_text"
   fi
 
-  step "Fetching latest deployments in $rg ($label)..."
+  # Deployments are not part of the --rg report, and a failed one would flip
+  # OVERALL for something that report never mentions — so skip the listing
+  # entirely there (one `az` call cheaper per poll).
+  if [[ "$with_deployments" != "1" ]]; then
+    return 0
+  fi
+
   if deploy_rows=$(run az deployment group list --resource-group "$rg" \
       --query "sort_by(@, &properties.timestamp)[].{n:name, t:properties.timestamp, s:properties.provisioningState}" \
       -o tsv | tail -n 3); then
@@ -148,6 +218,19 @@ check_group() {
     OVERALL=1
     GROUP_DEP_TEXT[$label]="could not list deployments in $rg"
   fi
+}
+
+# check_group <rg-name> <label>: the narrated wrapper around collect_group.
+check_group() {
+  local rg="$1" label="$2"
+
+  # Grouped so the per-resource `az resource show` probe storm collapses into
+  # one section in CI. Close the group on every path, and keep the calls at top
+  # level: an unclosed group swallows the rest of the step's output.
+  group "Collecting state for $rg ($label)"
+  step "Checking resource group $rg ($label)..."
+  collect_group "$rg" "$label"
+  step "Fetching latest deployments in $rg ($label)..."
   endgroup
 }
 
@@ -205,6 +288,24 @@ report_rows() {
   esac
 }
 
+# report_single_rg <rg-name>: the `--rg` report — the group's provisioning
+# state and its resources' states, and nothing else (no deployments, no
+# subscription header). An absent group is the one case with no resource list,
+# since there is nothing left to enumerate.
+report_single_rg() {
+  local rg_name="$1"
+  local rg_state="${GROUP_RG_STATE[target]:-unknown}"
+
+  step "Resource group $rg_name"
+  if [[ "$rg_state" == "absent" ]]; then
+    info "not found (deleted or never created)"
+    return 0
+  fi
+  report_state "$rg_state" "provisioningState: $rg_state"
+  p_step "Resources:"
+  report_rows "${GROUP_RES_TEXT[target]:-}" 0
+}
+
 # report_group <label> <rg-name>: prints one group's collected results.
 report_group() {
   local label="$1"
@@ -236,6 +337,20 @@ report_sub_deployments() {
   fi
   report_rows "$rows" 1
 }
+
+# Single-group mode: report and answer, with the exit code carrying the verdict
+# (0 gone, 1 not Succeeded, 2 all Succeeded). No subscription name lookup, no
+# deployment listings, no command log — the teardown Verify step polls this
+# every few minutes and only wants the one group's state.
+if [[ -n "$RG_ONLY" ]]; then
+  collect_group "$RG_ONLY" "target" 0
+  report_single_rg "$RG_ONLY"
+  if [[ "${GROUP_RG_STATE[target]:-}" == "absent" ]]; then
+    exit 0
+  fi
+  [[ "$OVERALL" -eq 0 ]] && exit 2
+  exit 1
+fi
 
 # Resolved once and reused in both headers below: it is an `az account show`
 # round-trip, and every caller only wants it for the log line.
