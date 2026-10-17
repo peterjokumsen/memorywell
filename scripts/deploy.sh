@@ -14,11 +14,12 @@ fi
 
 init_command_log "deploy"
 
-# Mint the timestamped deployment name + image tag (lazy: sourcing common.sh
-# alone reserves nothing; see deployment_name in common.sh).
+# Get client IP and mint the timestamped deployment name + image tag
+# (lazy: sourcing common.sh alone reserves nothing; see deployment_name in common.sh).
 DEPLOYMENT_NAME="$(deployment_name)"
 IMAGE_TAG="$(image_tag)"
-export DEPLOYMENT_NAME IMAGE_TAG
+CLIENT_IP="$(curl -s https://ifconfig.me)"
+export DEPLOYMENT_NAME IMAGE_TAG CLIENT_IP
 
 # Set the subscription context for Azure CLI commands
 run az account set --subscription "$SUBSCRIPTION_ID"
@@ -29,7 +30,7 @@ run az account set --subscription "$SUBSCRIPTION_ID"
 # `create`, deploy it automatically so one script call provisions everything;
 # `what-if` never creates anything, so it still fails fast with the fix.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-step "Checking shared resource group $SHARED_RG_NAME (ACR)..."
+step "Checking shared resource group $SHARED_RG_NAME..."
 if ! SHARED_RG_STATE=$(run_hide_stderr az group show --name "$SHARED_RG_NAME" --query properties.provisioningState -o tsv); then
   if [[ "$ACTION" == "create" ]]; then
     info "Shared resource group $SHARED_RG_NAME not found; deploying it first..."
@@ -46,6 +47,7 @@ elif [[ "$SHARED_RG_STATE" == "Deleting" ]]; then
   error "  az group show --name \"$SHARED_RG_NAME\" --query properties.provisioningState -o tsv"
   exit 1
 fi
+step "Checking shared ACR $(registry_name) exists..."
 if ! run_quiet az acr show -n "$(registry_name)"; then
   if [[ "$ACTION" == "create" ]]; then
     info "Shared ACR $(registry_name) not found in $SHARED_RG_NAME; redeploying it first..."

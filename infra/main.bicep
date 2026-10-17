@@ -13,6 +13,7 @@ param acrName string
 param keyVaultName string
 @secure()
 param postgresAdministratorPassword string
+@minLength(8) // fail if CLIENT_IP defaulted to ''
 param postgresClientIp string
 
 var globalInputs GlobalInputs = {
