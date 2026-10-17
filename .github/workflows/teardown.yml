@@ -200,3 +200,19 @@ jobs:
           fi
 
           exit "$status"
+
+      # The three log files written by init_command_log (command traces, stdout,
+      # stderr) hold what the console deliberately hides: stderr from the
+      # existence probes, and command output consumed by a $(...) capture.
+      # `if: always()` so a red run is still diagnosable after the runner is
+      # discarded; ignored on a dry run, which runs no scripts and so writes
+      # none. Short retention: these are per-nightly debug artifacts, not
+      # something to keep.
+      - name: Upload script logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: script-logs-${{ inputs.environment || 'dev' }}
+          path: logs/
+          if-no-files-found: ignore
+          retention-days: 7

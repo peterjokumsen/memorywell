@@ -42,17 +42,25 @@ _gh_escape_prop() {
   printf '%s' "$text"
 }
 
-# GitHub has no "success" annotation level: every non-error, non-warning level
-# (step/info/success/debug) is a notice, colourised by the UI itself. All of
-# them go to stderr, matching the local backend's level-to-stream split.
-step()    { _log_stderr "::notice::$(_gh_escape_data "$*")"; }
-info()    { _log_stderr "::notice::$(_gh_escape_data "$*")"; }
-success() { _log_stderr "::notice::$(_gh_escape_data "$*")"; }
-warn()    { _log_stderr "::warning::$(_gh_escape_data "$*")"; }
-error()   { _log_stderr "::error::$(_gh_escape_data "$*")"; }
+# Only the levels worth annotating are workflow commands:
+#   step    -> ::notice::    a milestone heading
+#   warn    -> ::warning::  a diagnostic
+#   error   -> ::error::     a failure
+#   debug   -> ::debug::    only with step debug logging enabled
+# info/success are plain text: they narrate routine progress, and annotating
+# them made every teardown run read as a wall of equal-weight "Notice:" lines
+# (10 notices in ~19 lines), which buried the warning and error that matter.
+# They still go to stderr, matching the local backend's level-to-stream split,
+# so a `$(...)` capture can never swallow them.
+step()  { _log_stderr "::notice::$(_gh_escape_data "$*")"; }
+warn()  { _log_stderr "::warning::$(_gh_escape_data "$*")"; }
+error() { _log_stderr "::error::$(_gh_escape_data "$*")"; }
 # Only visible when step debug logging is on (ACTIONS_STEP_DEBUG / the
 # "Enable debug logging" workflow setting).
-debug()   { _log_stderr "::debug::$(_gh_escape_data "$*")"; }
+debug() { _log_stderr "::debug::$(_gh_escape_data "$*")"; }
+
+info()    { _log_stderr "$*"; }
+success() { _log_stderr "$*"; }
 
 group()    { _log_stderr "::group::$(_gh_escape_data "$*")"; }
 endgroup() { _log_stderr '::endgroup::'; }
