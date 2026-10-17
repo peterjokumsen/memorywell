@@ -237,8 +237,12 @@ report_sub_deployments() {
   report_rows "$rows" 1
 }
 
+# Resolved once and reused in both headers below: it is an `az account show`
+# round-trip, and every caller only wants it for the log line.
+SUB_NAME="$(subscription_name)"
+
 log_vars \
-  "Subscription=$(subscription_name) ($SUBSCRIPTION_ID)" \
+  "Subscription=$SUB_NAME ($SUBSCRIPTION_ID)" \
   "Resource group=$RG_NAME" \
   "Shared resource group=$SHARED_RG_NAME"
 
@@ -279,7 +283,7 @@ step "Report"
 # stays outside it and must remain the last thing printed.
 group "Report"
 log_vars \
-  "Subscription=$(subscription_name) ($SUBSCRIPTION_ID)" \
+  "Subscription=$SUB_NAME ($SUBSCRIPTION_ID)" \
   "Scope=$([[ "$CHECK_ENV" == "1" && "$CHECK_SHARED" == "1" ]] && echo 'environment + shared' || ([[ "$CHECK_ENV" == "1" ]] && echo 'environment only' || echo 'shared only'))"
 
 if [[ "$CHECK_ENV" == "1" ]]; then
