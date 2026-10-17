@@ -34,6 +34,13 @@ module cosmos 'cosmos.bicep' = {
   }
 }
 
+module redis 'redis.bicep' = {
+  name: '${deployment().name}-redis'
+  params: {
+    inputs: inputs
+  }
+}
+
 module postgres 'postgres.bicep' = {
   name: '${deployment().name}-postgres'
   params: {
@@ -60,3 +67,4 @@ module containerApp 'containerapp.bicep' = {
 
 output appName string = containerApp.outputs.appName
 output fqdn string = containerApp.outputs.fqdn
+output redisHostName string = redis.outputs.hostName
