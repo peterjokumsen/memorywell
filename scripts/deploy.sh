@@ -79,6 +79,51 @@ else
   RG_STATE="absent"
 fi
 
+# Create the group when missing, ahead of the role grant below. main.bicep
+# declares it `existing`, so this script is the only thing that creates it —
+# which is the point: the Key Vault Secrets Officer grant must target the group
+# before the deployment writes connection strings into the vault. Tags are
+# deliberately NOT passed here; infra/modules/rgtags.bicep applies them during
+# the deployment so the tag values stay owned by Bicep.
+step "Ensuring resource group $RG_NAME exists..."
+if [[ "$RG_STATE" == "absent" ]]; then
+  run az group create --name "$RG_NAME" --location "$LOCATION"
+  RG_STATE="Created"
+fi
+
+# Writing a secret into Key Vault needs Secrets Officer; the in-template
+# Key Vault Secrets User role is read-only and is the API identity's, not the
+# deployer's. Scoped to the group rather than the vault so the grant outlives
+# teardown.sh --purge-vault. az role assignment create is idempotent, so this is
+# a no-op on repeat runs.
+step "Granting Key Vault write access in $RG_NAME..."
+KV_WRITER_ROLE="Key Vault Secrets Officer"
+RG_SCOPE="/subscriptions/${SUBSCRIPTION_ID}/resourceGroups/${RG_NAME}"
+
+# The pipeline principal for non-dev environments. Unset for local study runs;
+# prod should use a distinct SP with no dev privileges, scoped to its own group.
+# --assignee-object-id + --assignee-principal-type rather than --assignee: the
+# latter resolves the id through Microsoft Graph, which a CI service principal
+# may not be allowed to query. Passing the id directly also sidesteps the
+# principal-type inference that misfires while a new principal propagates.
+if [[ -n "${DEPLOYMENT_SP_OBJECT_ID:-}" ]]; then
+  run az role assignment create --role "$KV_WRITER_ROLE" \
+    --assignee-object-id "$DEPLOYMENT_SP_OBJECT_ID" \
+    --assignee-principal-type ServicePrincipal --scope "$RG_SCOPE"
+else
+  debug "DEPLOYMENT_SP_OBJECT_ID not set; skipping the pipeline principal grant."
+fi
+
+# Whoever is logged in. Not fatal when absent: a service-principal deploy has no
+# user to resolve and is covered by DEPLOYMENT_SP_OBJECT_ID instead.
+if HUMAN_OID=$(run_hide_stderr az ad signed-in-user show --query id -o tsv) && [[ -n "$HUMAN_OID" ]]; then
+  run az role assignment create --role "$KV_WRITER_ROLE" \
+    --assignee-object-id "$HUMAN_OID" \
+    --assignee-principal-type User --scope "$RG_SCOPE"
+else
+  warn "  No signed-in user found; skipping the interactive principal grant."
+fi
+
 step "Checking if image exists in ACR..."
 # The shared registry is guaranteed to exist by the check above; only the
 # `api:<env>` tag can be missing (first deploy, or after a `--shared`
@@ -114,6 +159,7 @@ log_vars \
   "RG state=${RG_STATE:-absent}" \
   "Shared resource group=$SHARED_RG_NAME" \
   "KeyVault=$VAULT_NAME" \
+  "CosmosAccount=$COSMOS_ACCOUNT_NAME" \
   "Location=$LOCATION" \
   "Deployment=$DEPLOYMENT_NAME" \
   "ImageTag=$IMAGE_TAG"
@@ -131,6 +177,65 @@ if [[ "$ACTION" == "what-if" ]]; then
   success "What-if analysis completed. No changes were made."
   exit 0
 fi
+
+# Keyless Cosmos (docs/phase-2/step-4.md): the account is deployed with
+# disableLocalAuth, so account keys are dead and the API can only authenticate
+# through the data-plane role assignment Bicep creates. An empty or partial
+# assignment list still deploys cleanly — the failure only appears as a 403 the
+# first time something reads the database, which is Phases 3-4 at the earliest.
+# Check it here, while a broken grant still fails the deploy instead of being
+# forgotten.
+step "Checking Cosmos data-plane role assignments..."
+
+# `az cosmosdb sql role assignment list` returns properties at the TOP level of
+# each element (principalId, scope), not nested under a `properties` object —
+# that is the raw ARM shape, not what the REST API docs suggest. Querying
+# `[].properties.principalId` yields nulls and reads as "no assignments".
+#
+# `-o tsv` emits one scalar per line here, so `grep -qx` matches a whole id
+# exactly. The tr() keeps it that way if a future az version switches to
+# tab-separated output for flat arrays.
+PRINCIPALS_RAW=""
+attempt=1
+max_attempts=6 # ~60s: the assignment can be listable a beat after the template succeeds
+until PRINCIPALS_RAW=$(run_hide_stderr az cosmosdb sql role assignment list \
+  --resource-group "$RG_NAME" \
+  --account-name "$COSMOS_ACCOUNT_NAME" \
+  --query '[].principalId' \
+  -o tsv) && [[ -n "$PRINCIPALS_RAW" ]]; do
+  if [[ "$attempt" -ge "$max_attempts" ]]; then
+    error "No Cosmos data-plane role assignments on $COSMOS_ACCOUNT_NAME after ${max_attempts} attempts."
+    error "Without them nothing can read the database (the account has local auth disabled)."
+    error "Inspect them directly (the stderr log also has the hidden retry errors):"
+    error "  az cosmosdb sql role assignment list -g \"$RG_NAME\" -a \"$COSMOS_ACCOUNT_NAME\" -o table"
+    exit 1
+  fi
+  warn "Role assignments not visible yet (attempt $attempt/$max_attempts), retrying in 5s..."
+  sleep 5
+  attempt=$((attempt + 1))
+done
+PRINCIPAL_IDS="$(printf '%s' "$PRINCIPALS_RAW" | tr '\t' '\n')"
+success "  Found $(printf '%s\n' "$PRINCIPAL_IDS" | grep -c . || true) role assignment(s)."
+
+# The API identity must be among them: the list can be non-empty purely from the
+# local-dev principal (COSMOS_USER_OBJECT_ID), which would pass the check above
+# while the app itself is still unauthorised. Identity name mirrors identity.bicep.
+if ! API_PRINCIPAL_ID=$(run_hide_stderr az identity show \
+  --name "identity-${BASE_NAME}-${ENVIRONMENT}" \
+  --resource-group "$RG_NAME" \
+  --query principalId -o tsv) || [[ -z "$API_PRINCIPAL_ID" ]]; then
+  error "Could not read the API managed identity principalId in $RG_NAME."
+  error "  az identity show -n \"identity-${BASE_NAME}-${ENVIRONMENT}\" -g \"$RG_NAME\" --query principalId -o tsv"
+  exit 1
+fi
+if ! grep -qxF "$API_PRINCIPAL_ID" <<< "$PRINCIPAL_IDS"; then
+  error "API identity $API_PRINCIPAL_ID has no Cosmos data-plane role assignment."
+  error "The app would deploy but fail every Cosmos call. Assignments found:"
+  printf '%s\n' "$PRINCIPAL_IDS" >&2
+  error "Expected the grant in infra/modules/cosmos.bicep (Built-in Data Contributor at database scope)."
+  exit 1
+fi
+success "  API identity is granted data-plane access."
 
 # One round trip for all four outputs (array order is preserved in -o tsv).
 # Outputs can lag the Succeeded state (ARM eventual consistency), so poll.

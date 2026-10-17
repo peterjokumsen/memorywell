@@ -1,9 +1,10 @@
 import { ResourceGroupInputs } from './_types.bicep'
 
 param inputs ResourceGroupInputs
+param identityPrincipalId string
 
 resource account 'Microsoft.DocumentDB/databaseAccounts@2025-10-15' = {
-  name: 'cosmos-${inputs.global.baseName}-${inputs.global.environment}'
+  name: inputs.global.cosmosAccountName
   location: inputs.global.location
   tags: inputs.tags
   kind: 'GlobalDocumentDB'
@@ -11,16 +12,20 @@ resource account 'Microsoft.DocumentDB/databaseAccounts@2025-10-15' = {
     capabilities: [{ name: 'EnableServerless' }]
     consistencyPolicy: { defaultConsistencyLevel: 'Session' }
     databaseAccountOfferType: 'Standard'
+    // Keyless: the API authenticates with its user-assigned identity via the
+    // data-plane role below. Without this the account key still works and
+    // nothing actually forces clients off keys.
+    disableLocalAuth: true
     locations: [{ locationName: inputs.global.location, failoverPriority: 0 }]
   }
 }
 
 resource database 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases@2025-10-15' = {
   parent: account
-  name: 'memorywell'
+  name: inputs.global.cosmosDatabase
   properties: {
     resource: {
-      id: 'memorywell'
+      id: inputs.global.cosmosDatabase
     }
   }
 }
@@ -72,6 +77,30 @@ resource containersLoop 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/cont
   }
 ]
 
+// Cosmos data-plane roles are defined under the account// (<account>/sqlRoleDefinitions/...), not under Microsoft.Authorization, so
+// they cannot use subscriptionResourceId() the way acr-pull.bicep does.
+// 00000000-0000-0000-0000-000000000001 = Built-in Data Contributor.
+// Scoped to the database rather than the account so a future second database
+// is not implicitly readable.
+var cosmosDataContributorRoleId = '00000000-0000-0000-0000-000000000001'
+
+// filter() drops the developer principal when it was not supplied, so a fresh
+// clone without the env var still deploys instead of failing on an empty id.
+var dataPrincipals = filter([identityPrincipalId, inputs.global.cosmosPrincipalObjectId], p => p != '')
+
+resource dataRoles 'Microsoft.DocumentDB/databaseAccounts/sqlRoleAssignments@2025-10-15' = [
+  for principal in dataPrincipals: {
+    parent: account
+    name: guid(database.id, principal, cosmosDataContributorRoleId)
+    properties: {
+      roleDefinitionId: '${account.id}/sqlRoleDefinitions/${cosmosDataContributorRoleId}'
+      principalId: principal
+      scope: '${account.id}/dbs/${database.name}'
+    }
+  }
+]
+
 output accountName string = account.name
 output accountEndpoint string = account.properties.documentEndpoint
 output databaseName string = database.name
+output databaseResourceId string = database.id

@@ -3,17 +3,9 @@ import { ResourceGroupInputs } from './_types.bicep'
 param inputs ResourceGroupInputs
 param identityPrincipalId string
 
-// The vault name comes from outside (main.bicepparam reads the VAULT_NAME env
-// var that scripts/common.sh exports) instead of being rebuilt from
-// baseName/environment here: deploy.sh and teardown.sh probe the vault by that
-// name before any deployment has run, so the scripts own the name and Bicep
-// follows. Renaming it is a .env change, not a template edit.
-@description('Name of the Key Vault to create. Supplied by the caller; must be globally unique within Azure.')
-@minLength(1)
-param keyVaultName string
-
 resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' = {
-  name: keyVaultName
+  // Vault name provided from input so that it has a single source of truth, for soft-delete checks etc.
+  name: inputs.global.keyVaultName
   location: inputs.global.location
   tags: inputs.tags
   properties: {

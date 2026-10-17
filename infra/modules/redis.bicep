@@ -19,3 +19,5 @@ resource cache 'Microsoft.Cache/redis@2024-03-01' = {
 
 output cacheName string = cache.name
 output hostName string = cache.properties.hostName
+@secure() // going to prod should use Entra ACL user instead of key
+output connectionString string = cache.listKeys().primaryKey

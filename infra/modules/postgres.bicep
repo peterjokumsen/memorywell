@@ -2,7 +2,6 @@ import { ResourceGroupInputs } from './_types.bicep'
 
 param inputs ResourceGroupInputs
 param administratorLogin string
-param clientIpAddress string
 @secure()
 param administratorPassword string
 
@@ -39,7 +38,7 @@ resource database 'Microsoft.DBforPostgreSQL/flexibleServers/databases@2025-08-0
   parent: server
   name: 'memorywell'
   properties: {
-    charset: 'utf8'
+    charset: 'UTF8'
     collation: 'en_US.utf8'
   }
 }
@@ -57,11 +56,13 @@ resource clientFirewallRule 'Microsoft.DBforPostgreSQL/flexibleServers/firewallR
   parent: server
   name: 'allow-client'
   properties: {
-    startIpAddress: clientIpAddress
-    endIpAddress: clientIpAddress
+    startIpAddress: inputs.global.postgresClientIp
+    endIpAddress: inputs.global.postgresClientIp
   }
 }
 
 output serverName string = server.name
 output serverFqdn string = server.properties.fullyQualifiedDomainName
 output databaseName string = database.name
+@secure()
+output connectionString string = 'Host=${server.properties.fullyQualifiedDomainName};Port=5432;Database=${database.name};Username=${administratorLogin};Password=${administratorPassword}'

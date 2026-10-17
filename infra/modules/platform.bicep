@@ -6,10 +6,8 @@ param inputs ResourceGroupInputs
 param acrLoginServer string
 param identityId string
 param identityPrincipalId string
-param keyVaultName string
 @secure()
 param postgresAdministrationPassword string
-param postgresClientIp string
 
 module monitoring 'monitor.bicep' = {
   name: '${deployment().name}-monitoring'
@@ -23,7 +21,6 @@ module keyVault 'vault.bicep' = {
   params: {
     inputs: inputs
     identityPrincipalId: identityPrincipalId
-    keyVaultName: keyVaultName
   }
 }
 
@@ -31,6 +28,7 @@ module cosmos 'cosmos.bicep' = {
   name: '${deployment().name}-cosmos'
   params: {
     inputs: inputs
+    identityPrincipalId: identityPrincipalId
   }
 }
 
@@ -41,13 +39,32 @@ module redis 'redis.bicep' = {
   }
 }
 
+var redisConnKey = 'redis-connection-string'
+module redisConnectionString 'secret.bicep' = {
+  name: '${deployment().name}-redis-conn'
+  params: {
+    inputs: inputs
+    secretName: redisConnKey
+    secretValue: redis.outputs.connectionString
+  }
+}
+
 module postgres 'postgres.bicep' = {
   name: '${deployment().name}-postgres'
   params: {
     inputs: inputs
     administratorPassword: postgresAdministrationPassword
     administratorLogin: 'memwelladmin'
-    clientIpAddress: postgresClientIp
+  }
+}
+
+var postgresConnKey = 'postgres-connection-string'
+module postgresConnectionString 'secret.bicep' = {
+  name: '${deployment().name}-postgres-conn'
+  params: {
+    inputs: inputs
+    secretName: postgresConnKey
+    secretValue: postgres.outputs.connectionString
   }
 }
 
@@ -62,6 +79,13 @@ module containerApp 'containerapp.bicep' = {
     monitorCustomerId: monitoring.outputs.customerId
     monitorWorkspaceId: monitoring.outputs.workspaceId
     monitorApiVersion: monitoring.outputs.apiVersion
+    env: {
+      cosmosDatabase: cosmos.outputs.databaseName
+      cosmosEndpoint: cosmos.outputs.accountEndpoint
+      keyVaultUri: keyVault.outputs.keyVaultUri
+      postgresConnKey: postgresConnKey
+      redisConnKey: redisConnKey
+    }
   }
 }
 

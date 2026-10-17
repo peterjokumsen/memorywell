@@ -39,9 +39,7 @@ export RG_NAME="rg-${BASE_NAME}-${ENVIRONMENT}"
 # serves every environment; `acr` prefix + stripped hyphens keep it valid and
 # globally unique.
 SHARED_RG_NAME="rg-${BASE_NAME}-shared"
-export SHARED_RG_NAME
 SHARED_ACR_NAME="$(echo "acr${BASE_NAME}" | tr '[:upper:]' '[:lower:]' | tr -d '-')"
-export SHARED_ACR_NAME
 # Key Vault name for this environment, and the single source of truth for it:
 # deploy.sh/teardown.sh probe the vault by this name, and infra/main.bicepparam
 # reads it back through readEnvironmentVariable('VAULT_NAME'), so the template
@@ -49,7 +47,19 @@ export SHARED_ACR_NAME
 # globally unique: changing BASE_NAME or ENVIRONMENT changes it, and a
 # soft-deleted vault keeps the old name reserved until it is purged.
 VAULT_NAME="kv-${BASE_NAME}-${ENVIRONMENT}"
-export VAULT_NAME
+COSMOS_ACCOUNT_NAME="cosmos-${BASE_NAME}-${ENVIRONMENT}"
+# Cosmos endpoint is a pure function of the account name, so derive it rather
+# than querying `az cosmosdb show`: sourcing common.sh must stay free of Azure
+# round-trips (same reasoning as registry_name/login_server below, and unlike
+# the probes in _azure.sh). Scripts use this for local tooling such as
+# scripts/seed.py, which authenticates with DefaultAzureCredential.
+COSMOS_ENDPOINT="https://${COSMOS_ACCOUNT_NAME}.documents.azure.com:443/"
+# Threaded into infra as a param rather than hardcoded in cosmos.bicep, so this
+# stays the single source of truth the same way VAULT_NAME and
+# COSMOS_ACCOUNT_NAME do.
+COSMOS_DATABASE="memorywell"
+
+export COSMOS_ACCOUNT_NAME COSMOS_DATABASE COSMOS_ENDPOINT SHARED_ACR_NAME SHARED_RG_NAME VAULT_NAME
 
 registry_name() { echo "$SHARED_ACR_NAME"; }
 login_server() { echo "${SHARED_ACR_NAME}.azurecr.io"; }
