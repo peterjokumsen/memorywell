@@ -67,7 +67,12 @@ summary() {
   if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
     printf '%s\n' "$*" >> "$GITHUB_STEP_SUMMARY"
   fi
-  info "$*"
+  # Console echo via _log_stderr, not `info`: the GitHub backend now writes every
+  # `info` to the summary as an `- **info** …` bullet, so a markdown block passed
+  # through `info` would land there twice — once verbatim, once as a pile of
+  # bullets per line. _log_stderr is the backend-neutral write path and keeps the
+  # chatter off stdout, so a $(...) capture stays clean on both backends.
+  _log_stderr "$*"
 }
 
 log_vars() {

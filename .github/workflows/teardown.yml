@@ -46,7 +46,8 @@ jobs:
     # name suffix in rg-<base>-<environment>.
     environment: azure # holds the OIDC federated credential; see docs/CI_TEARDOWN.md
     # Worst case: teardown.sh's 5 min vault wait + Verify's 30 min group wait +
-    # 5 min vault wait, with headroom for Azure's own latency.
+    # 10 min vault wait (VAULT_SOFT_DELETE_WAIT_MINUTES is left at its default
+    # here, not passed like the 5 min above), with headroom for Azure's latency.
     timeout-minutes: 60
 
     steps:
@@ -242,6 +243,23 @@ jobs:
           # then purge it: that is the state the next deploy needs. If it never
           # appears, the vault was already purged (or never existed).
           #
+          # ...except that "never appears" used to mean burning the entire wait
+          # budget on every run where the Teardown step above had already purged
+          # it — which is every run, since it runs with --purge-vault. Nine and a
+          # half minutes of polling for a vault that was gone, then a summary
+          # saying so.
+          #
+          # So decide once, up front, whether there is anything to wait for.
+          # This step starts while the group is still deleting, and a vault on
+          # its way to soft-delete still answers `keyvault show` at that point;
+          # one that was already purged does not. That single probe separates
+          # "the vault is coming" from "there is nothing to wait for".
+          #
+          # It cannot miss a purge: the loop below still runs its list-deleted
+          # check *before* consulting this, so a vault that is already
+          # soft-deleted is still purged on the first pass. The probe only stops
+          # a wait that provably cannot succeed.
+          #
           # The list call must not be piped straight into grep: an `az` failure
           # would look like "no vault found" and pass silently.
           vault_wait_min="${VAULT_SOFT_DELETE_WAIT_MINUTES:-10}"
@@ -252,6 +270,13 @@ jobs:
           # Set on every path below, so the summary table can never report
           # "not checked" for a vault this step actually looked at.
           vault_outcome="not checked"
+          if az keyvault show --name "$VAULT_NAME" >/dev/null 2>&1; then
+            vault_pending=1
+            echo "Key Vault $VAULT_NAME is live; waiting for it to surface as soft-deleted."
+          else
+            vault_pending=0
+            echo "Key Vault $VAULT_NAME is not live; only a pending purge can still change that."
+          fi
           for attempt in $(seq 1 "$vault_attempts"); do
             vault_checked=1
             if ! deleted_vaults=$(az keyvault list-deleted --query "[?name=='$VAULT_NAME'].name" -o tsv); then
@@ -273,14 +298,26 @@ jobs:
               fi
               break
             fi
+            # Not soft-deleted, and nothing was live to begin with: no future
+            # poll can change the answer, so stop instead of spending the rest
+            # of the budget confirming it.
+            if [[ "$vault_pending" -eq 0 ]]; then
+              echo "Key Vault $VAULT_NAME is not soft-deleted and was not live; already purged, or never existed."
+              vault_outcome="not soft-deleted (already purged, or never existed)"
+              break
+            fi
             if [[ "$attempt" -lt "$vault_attempts" ]]; then
               echo "Vault check $attempt/$vault_attempts: $VAULT_NAME is not soft-deleted yet, retrying in 30s..."
               sleep 30
             fi
           done
           if [[ "$purged" -eq 0 && "$vault_checked" -eq 1 && "$vault_outcome" == "not checked" ]]; then
-            echo "Key Vault $VAULT_NAME is not soft-deleted; nothing to purge."
-            vault_outcome="not soft-deleted (already purged, or never existed)"
+            # Only reachable now when vault_pending was 1: a vault really was
+            # live and still has not surfaced within the budget. That is not the
+            # same as "nothing to purge" — the name may still block the next
+            # deploy — so say so rather than reporting a clean pass.
+            echo "::warning::Key Vault $VAULT_NAME was live but has not appeared in list-deleted after ${vault_wait_min} min; it may still block a same-name redeploy."
+            vault_outcome="**not soft-deleted yet** (was live; may still block a redeploy)"
           fi
 
           # The run summary: one table answering "is this environment gone and can I
