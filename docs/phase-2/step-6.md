@@ -8,6 +8,6 @@ reads secrets from env, never hardcodes.
 
 ## Verify
 
-- [ ] `scripts/teardown.sh --purge-vault` still destroys everything (Phase 1
+- [x] `scripts/teardown.sh --purge-vault` still destroys everything (Phase 1
       stack + Phase 2 data stores).
-- [ ] `git status --short` shows no `.env`, no secrets.
+- [x] `git status --short` shows no `.env`, no secrets.
