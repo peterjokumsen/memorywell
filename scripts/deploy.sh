@@ -167,7 +167,7 @@ log_vars \
 # run_deployment, not `run`: this call is silent for minutes at a time (ARM
 # returns nothing until the deployment finishes), so it reports what it is
 # waiting for instead of looking hung.
-run_deployment "$DEPLOYMENT_NAME" "$ACTION" \
+run_deployment "$RG_NAME" "$DEPLOYMENT_NAME" "$ACTION" \
   --location "$LOCATION" \
   --name "$DEPLOYMENT_NAME" \
   --template-file "$ROOT/infra/main.bicep" \
