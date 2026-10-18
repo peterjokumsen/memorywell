@@ -58,7 +58,7 @@ log_vars \
 # run_deployment, not `run`: this call is silent for minutes at a time (ARM
 # returns nothing until the deployment finishes), so it reports what it is
 # waiting for instead of looking hung.
-run_deployment "$SHARED_DEPLOYMENT_NAME" "$ACTION" \
+run_deployment "$SHARED_RG_NAME" "$SHARED_DEPLOYMENT_NAME" "$ACTION" \
   --location "$LOCATION" \
   --name "$SHARED_DEPLOYMENT_NAME" \
   --template-file "$ROOT/infra/shared.bicep" \
