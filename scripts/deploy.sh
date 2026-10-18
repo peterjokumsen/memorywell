@@ -237,6 +237,51 @@ if ! grep -qxF "$API_PRINCIPAL_ID" <<< "$PRINCIPAL_IDS"; then
 fi
 success "  API identity is granted data-plane access."
 
+# The grants must also be the right ROLE, not merely present. cosmos.bicep
+# grants by GUID, and the built-in data roles sit one character apart:
+# ...0001 is Built-in Data Reader, ...0002 is Built-in Data Contributor.
+# Nothing rejects the wrong one — ARM accepts it, the check above sees a
+# principal on an assignment and passes, every read succeeds, and only writes
+# fail Forbidden at runtime. A deploy that reports success here while granting
+# Reader is exactly how that reaches the seed hours later.
+#
+# The granted ids are resolved to role names rather than compared against the
+# Contributor GUID again, so this states the intent ("this grant can write")
+# instead of repeating the constant it exists to police — change the role in
+# cosmos.bicep and this follows it.
+GRANTED_ROLE_ROWS="$(run_hide_stderr az cosmosdb sql role assignment list \
+  --resource-group "$RG_NAME" \
+  --account-name "$COSMOS_ACCOUNT_NAME" \
+  --query '[].{p:principalId, r:roleDefinitionId}' \
+  -o tsv)" || {
+  error "Could not read Cosmos data-plane role assignments."
+  exit 1
+}
+
+UNWRITABLE=""
+while IFS=$'\t' read -r granted_principal granted_role_id; do
+  [[ -z "$granted_role_id" ]] && continue
+  # roleDefinitionId is the full ARM resource path; the definition list keys on
+  # the bare GUID.
+  granted_role_name="$(run_hide_stderr az cosmosdb sql role definition list \
+    --resource-group "$RG_NAME" \
+    --account-name "$COSMOS_ACCOUNT_NAME" \
+    --query "[?name=='${granted_role_id##*/}'].roleName" \
+    -o tsv)" || granted_role_name=""
+  if [[ "$granted_role_name" != "Cosmos DB Built-in Data Contributor" ]]; then
+    UNWRITABLE+="${granted_principal} (${granted_role_name:-unknown role ${granted_role_id##*/}})"$'\n'
+  fi
+done <<< "$GRANTED_ROLE_ROWS"
+
+if [[ -n "$UNWRITABLE" ]]; then
+  error "Cosmos data-plane grants that cannot write:"
+  printf '%s' "$UNWRITABLE" | while IFS= read -r line; do error "  $line"; done
+  error "Data Reader grants pass a presence check but fail every upsert with Forbidden."
+  error "Fix the role id in infra/modules/cosmos.bicep (...0002 = Data Contributor) and redeploy."
+  exit 1
+fi
+success "  All data-plane grants are Built-in Data Contributor."
+
 # One round trip for all four outputs (array order is preserved in -o tsv).
 # Outputs can lag the Succeeded state (ARM eventual consistency), so poll.
 DEPLOYMENT_OUTPUTS="$(fetch_deployment_outputs "$DEPLOYMENT_NAME" \

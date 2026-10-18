@@ -64,6 +64,22 @@ MEMORY_ID = "mem-seed-1"
 ALIAS_LOOKUP_KEY = "seed:alias-lookup"
 
 
+def now_iso() -> str:
+    """Return the current UTC time as an ISO 8601 string ending in `Z`.
+
+    Cosmos stores JSON and the SDK serializes item bodies with the stdlib json
+    encoder, which has no handler for datetime: an item carrying one raises
+    `TypeError: Object of type datetime is not JSON serializable` at upsert, and
+    it does so on the first document written, so the traceback points at
+    upsert_item rather than at the `createdAt` that caused it.
+
+    A string is what Cosmos holds anyway once written. It round-trips in both
+    directions the seed needs: `datetime.fromisoformat` reads the `Z` form back
+    on 3.11+, and Postgres casts the same text to timestamptz on insert.
+    """
+    return datetime.now(UTC).isoformat().replace("+00:00", "Z")
+
+
 def _contributors() -> list[dict]:
     """The four membership rows: 2 owners + 1 Full Contributor + 1 Observer.
 
@@ -225,7 +241,11 @@ def seed_documents(conn: psycopg.Connection, memory: dict) -> None:
     vectors that phase generated.
     """
     doc_id = uuid.uuid5(uuid.NAMESPACE_URL, memory["id"])
-    created_at = memory.get("createdAt") or datetime.now(UTC)
+    # Read straight through as the ISO string it already is. createdAt is a
+    # timestamptz column and Postgres parses ISO 8601 text, so converting to a
+    # datetime here would only add a place for the two representations to
+    # disagree; now_iso() covers the missing-value case in the same format.
+    created_at = memory.get("createdAt") or now_iso()
 
     conn.execute(
         """
@@ -351,7 +371,11 @@ def seed_cosmos(db) -> dict:
     Returns the memory document so main() can mirror it into Postgres without
     rebuilding it (a rebuilt copy could disagree with what was written).
     """
-    now = datetime.now(UTC)
+    # One timestamp for the whole seed, and a string rather than a datetime —
+    # see now_iso(). Re-running produces a new value, which the upsert then
+    # overwrites; that is the intent, not a violation of the idempotency rule
+    # (which is about row counts, and what step-5.md verifies).
+    now = now_iso()
 
     upsert(
         db,
@@ -418,6 +442,32 @@ def seed_redis(conn: redis.Redis) -> None:
 # --- Entry point ------------------------------------------------------------
 
 
+def count_items(db, container_name: str) -> int:
+    """Return how many items `container_name` holds.
+
+    A COUNT query rather than reading the items: the seed runs against a
+    container that may hold real data, and this is only here to print the
+    counts step-5.md verifies. The cross-partition flag is required — the
+    containers partition on /chronicleId or /householdId, so a plain query would
+    only see one partition and undercount.
+
+    `SELECT VALUE COUNT(1)`, with no alias: cross-partition aggregates accept
+    only the VALUE form, and `COUNT(1) AS count` is rejected with
+    "Cross partition query only supports 'VALUE <AggregateFunc>'". VALUE makes
+    each result row the bare number, hence rows[0] rather than rows[0]["count"].
+
+    Note there is no count helper on the SDK's DatabaseProxy; anything named
+    like one belongs to the test fake, not to Cosmos.
+    """
+    rows = list(
+        db.get_container_client(container_name).query_items(
+            query="SELECT VALUE COUNT(1) FROM c",
+            enable_cross_partition_query=True,
+        )
+    )
+    return int(rows[0])
+
+
 def main() -> None:
     """Run the seed in order: schema, then data, then report counts.
 
@@ -444,7 +494,7 @@ def main() -> None:
         seed_redis(redis.Redis.from_url(secrets[SECRET_REDIS], decode_responses=True))
 
         counts = {
-            name: db.count_in(name)
+            name: count_items(db, name)
             for name in ("households", "chronicles", "contributors", "memories")
         }
 

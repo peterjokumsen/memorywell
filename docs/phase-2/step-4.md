@@ -15,9 +15,12 @@ Do this in `cosmos.bicep` (account property) and `platform.bicep`
   keyless — without it the account key still works and nothing else forces
   clients to use identity.
 - Assign the API's user-assigned identity the Cosmos **Built-in Data
-  Contributor** data-plane role (`00000000-0000-0000-0000-000000000001`) at
+  Contributor** data-plane role (`00000000-0000-0000-0000-000000000002`) at
   **database** scope (`cosmos.bicep`, `scope: database`) rather than account
   scope, so a future second database is not implicitly readable.
+  `…0001` is Built-in Data **Reader** — one character away, accepted by ARM,
+  and it fails only on writes. Resolve any id before trusting it:
+  `az cosmosdb sql role definition list --query "[].{id:name, role:roleName}"`.
 - Pass the endpoint to the Container App as a **plain env var**
   (`COSMOS_ENDPOINT` from `cosmos.outputs.accountEndpoint`) plus
   `COSMOS_DATABASE` (from `cosmos.outputs.databaseName`). Not secrets —
@@ -40,10 +43,10 @@ literal values. Bicep must not emit secrets in outputs.
 
 ## Verify
 
-- [ ] Cosmos account shows local-key auth **disabled**, and the API identity
+- [x] Cosmos account shows local-key auth **disabled**, and the API identity
       shows data contributor at database scope via
       `az cosmosdb sql role assignment list`.
-- [ ] Key Vault holds exactly **two** secrets (Postgres, Redis); Bicep outputs
+- [x] Key Vault holds exactly **two** secrets (Postgres, Redis); Bicep outputs
       contain no secret values; API identity holds `Key Vault Secrets User`.
-- [ ] Container App env shows `COSMOS_ENDPOINT` / `COSMOS_DATABASE` as plain
+- [x] Container App env shows `COSMOS_ENDPOINT` / `COSMOS_DATABASE` as plain
       values and both Postgres/Redis vars as Key Vault references.

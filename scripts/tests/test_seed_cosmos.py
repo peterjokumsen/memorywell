@@ -9,6 +9,8 @@ Role labels are not asserted, only counts: AGENTS.md describes the roles in
 prose, so the vocabulary is not pinned to string values until Phase 3.
 """
 
+import json
+
 import pytest
 import seed
 from fakes import FakeCosmosDb, FakePartitionKey
@@ -207,6 +209,34 @@ def test_seed_cosmos_memory_is_multi_turn_ready(seeded):
     memory = seeded.docs_in("memories")[0]
     for field in ("promptId", "parentMemoryId", "turnCount", "conversationId"):
         assert field in memory, f"memory missing {field} (schema is multi-turn-ready)"
+
+
+def test_every_seeded_document_is_json_serializable(seeded):
+    """No datetime (or any other non-JSON type) may reach an item body.
+
+    Cosmos stores JSON and the SDK hands the body to the stdlib json encoder,
+    which has no handler for datetime — a raw one raises `TypeError: Object of
+    type datetime is not JSON serializable` inside upsert_item. FakeCosmosDb
+    stores dicts as given, so without this test the failure only appears against
+    a live account, and on the first document written, which points the reader at
+    the wrong line.
+
+    now_iso() is what keeps createdAt a string; this pins the property rather
+    than the helper, so any future timestamp field is covered too.
+    """
+    for name in ("households", "chronicles", "contributors", "memories"):
+        for doc in seeded.docs_in(name):
+            json.dumps(doc)  # raises TypeError on a datetime
+
+
+def test_created_at_is_an_iso_utc_string(seeded):
+    """The `Z` suffix, not `+00:00`: it is the form Cosmos documents carry, and
+    datetime.fromisoformat reads it back on 3.11+."""
+    for name in ("households", "chronicles", "memories"):
+        for doc in seeded.docs_in(name):
+            created_at = doc["createdAt"]
+            assert isinstance(created_at, str)
+            assert created_at.endswith("Z"), f"{name}/{doc.get('id')}: {created_at!r}"
 
 
 def test_seed_cosmos_is_idempotent():

@@ -9,9 +9,9 @@ Pure only: no Azure, no network, no database. Anything that needs a live store
 belongs in the Step 5 manual Verify checklist (docs/phase-2/step-5.md), not here
 — it cannot run in CI, which has no credentials, and the resources are not free.
 
-Three of these are drift guards rather than behaviour tests: 1536 is recorded in
-three places, the secret names in two, and the Redis URL format is decided in
-infra. Nothing else catches any of them drifting apart.
+Four of these are drift guards rather than behaviour tests: 1536 is recorded in
+three places, the secret names in two, and the Redis and Postgres URL formats
+are decided in infra. Nothing else catches any of them drifting apart.
 
 Two things deliberately NOT asserted, because nothing in the repo pins them:
   - the exact role strings (AGENTS.md says "N owners + Full Contributor +
@@ -111,6 +111,29 @@ def test_redis_secret_is_a_url_not_an_azure_key_string():
     assert "rediss://" in url_output, (
         "redis.bicep must emit a rediss:// URL for the redis-url secret; "
         "Redis.from_url() cannot parse Azure's key string"
+    )
+
+
+def test_postgres_secret_is_a_url_not_an_ado_connection_string():
+    """The postgres secret must be a postgresql:// URL, whatever the server produced.
+
+    Azure's portal shows flexible servers as `Host=…;Port=5432;Database=…`, an
+    ADO.NET string. psycopg3 accepts only a URI or libpq keyword/value conninfo,
+    so the ADO form dies at connect() with `invalid connection option "Host"` —
+    far from the Bicep line that produced it, and after a deploy that otherwise
+    succeeded.
+
+    postgres.bicep builds the string; this pins the scheme so the two agree, the
+    same guard as the Redis URL above.
+    """
+    postgres_bicep = (REPO_ROOT / "infra" / "modules" / "postgres.bicep").read_text()
+
+    conn_output = next(
+        line for line in postgres_bicep.splitlines() if "output connectionString" in line
+    )
+    assert "postgresql://" in conn_output, (
+        "postgres.bicep must emit a postgresql:// URL for the postgres secret; "
+        "psycopg.connect() cannot parse Azure's ADO.NET connection string"
     )
 
 

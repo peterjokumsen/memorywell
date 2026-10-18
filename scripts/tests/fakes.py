@@ -63,6 +63,17 @@ class FakeCosmosContainer:
         items = list(self.items.values())
         return items[:max_item_count] if max_item_count else items
 
+    def query_items(self, query: str, **kwargs: Any) -> list[Any]:
+        """Answers the one aggregate query the seed runs: VALUE COUNT(1).
+
+        Returns bare numbers, like the SDK does for a VALUE aggregate, so a
+        caller reading rows[0] works against both. Any other query is a bug in
+        the seed, not something to emulate — assert rather than silently return
+        something plausible.
+        """
+        assert "COUNT(1)" in query, f"fake only answers COUNT queries, got: {query!r}"
+        return [len(self.items)]
+
 
 class FakeCosmosDb:
     """A database whose containers already exist, as they do after deploy.sh."""
@@ -127,11 +138,21 @@ class FakePartitionKey:
 class FakeSqlConn:
     """Records executed SQL so tests can assert on the DDL shape."""
 
-    def __init__(self) -> None:
+    def __init__(self, rows: tuple[Any, ...] = (0,)) -> None:
         self.statements: list[str] = []
+        # What fetchone() hands back. main() reads a count out of the database,
+        # so the fake needs to answer something row-shaped.
+        self.rows: tuple[Any, ...] = rows
 
-    def execute(self, sql: str, params: Any = None) -> None:
+    def execute(self, sql: str, params: Any = None) -> FakeSqlConn:
+        # Returns something row-shaped, because psycopg's Connection.execute
+        # returns a Cursor, not the connection. seed.py chains
+        # .execute(...).fetchone() and the fake has to allow that.
         self.statements.append(sql)
+        return self
+
+    def fetchone(self) -> tuple[Any, ...]:
+        return self.rows
 
     def cursor(self) -> FakeSqlConn:
         return self
