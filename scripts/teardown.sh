@@ -100,7 +100,10 @@ if [[ "$PURGE_VAULT" == "1" ]]; then
     if wait_for_soft_deleted_vault; then
       step "Purging soft-deleted Key Vault $VAULT_NAME..."
       run az keyvault purge --name "$VAULT_NAME"
-      info "Environment resource group deleted, vault purged."
+      # `success`, not `info`: this is the outcome the run exists to produce, and
+      # the GitHub backend puts successes in the workflow summary (see
+      # _log-ghactions.sh) while `info` stays log-only.
+      success "Environment resource group deleted, vault purged."
     else
       exit 1
     fi
@@ -108,9 +111,9 @@ if [[ "$PURGE_VAULT" == "1" ]]; then
     # Nothing to delete, but a previous run left the vault soft-deleted.
     step "Purging soft-deleted Key Vault $VAULT_NAME..."
     run az keyvault purge --name "$VAULT_NAME"
-    info "Key Vault $VAULT_NAME purged."
+    success "Key Vault $VAULT_NAME purged."
   else
-    info "No resource group to delete and $VAULT_NAME is neither live nor soft-deleted; assuming it was already purged."
+    success "No resource group to delete and $VAULT_NAME is neither live nor soft-deleted; assuming it was already purged."
   fi
 else
   info "Skipping Key Vault purge (pass --purge-vault to purge $VAULT_NAME for same-name redeploy)."

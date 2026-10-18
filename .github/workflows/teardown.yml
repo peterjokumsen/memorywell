@@ -163,8 +163,13 @@ jobs:
           VAULT_SOFT_DELETE_WAIT_MINUTES: "10"
         run: |
           set -euo pipefail
+          # `summary` is the only thing this step needs from the scripts, and it
+          # is what puts the outcome on the run summary page instead of leaving
+          # it buried in a 30-minute log.
+          source scripts/_log.sh
           rg_name="rg-$BASE_NAME-$ENVIRONMENT"
           status=0
+          started_at="$(date -u +%H:%M:%S)"
 
           timeout_min="${RG_WAIT_TIMEOUT_MINUTES:-30}"
           poll_seconds="${RG_POLL_SECONDS:-20}"
@@ -180,7 +185,7 @@ jobs:
           report_state() {
             local rc=0
             echo "--- state of $rg_name ---"
-            ./scripts/check-state.sh --rg "$rg_name" || rc=$?
+            ./scripts/check-state.sh --rg "$rg_name" --summary || rc=$?
             case "$rc" in
               0) echo "--- $rg_name is gone ---" ;;
               1) echo "--- still draining: some resources are not Succeeded ---" ;;
@@ -200,11 +205,13 @@ jobs:
           [[ "$report_every" -ge 1 ]] || report_every=1
           next_report=1
           gone=0
+          gone_after_minutes="?"
           attempt=1
           while true; do
             if ! az group show --name "$rg_name" >/dev/null 2>&1; then
               echo "Check $attempt/$max_attempts: resource group $rg_name is gone."
               gone=1
+              gone_after_minutes=$((attempt * poll_seconds / 60))
               break
             fi
             if (( attempt >= next_report )); then
@@ -242,20 +249,26 @@ jobs:
           [[ "$vault_attempts" -ge 1 ]] || vault_attempts=1
           purged=0
           vault_checked=0
+          # Set on every path below, so the summary table can never report
+          # "not checked" for a vault this step actually looked at.
+          vault_outcome="not checked"
           for attempt in $(seq 1 "$vault_attempts"); do
             vault_checked=1
             if ! deleted_vaults=$(az keyvault list-deleted --query "[?name=='$VAULT_NAME'].name" -o tsv); then
               echo "::error::Failed to list soft-deleted Key Vaults; cannot settle the state of $VAULT_NAME."
               status=1
+              vault_outcome="**could not check** (list-deleted failed)"
               break
             fi
             if printf '%s\n' "$deleted_vaults" | grep -q "$VAULT_NAME"; then
               echo "Key Vault $VAULT_NAME is soft-deleted; purging it."
               if az keyvault purge --name "$VAULT_NAME"; then
                 purged=1
+                vault_outcome="soft-deleted, then purged"
                 echo "Key Vault $VAULT_NAME purged."
               else
                 echo "::error::Failed to purge $VAULT_NAME; the next same-name deploy will be blocked."
+                vault_outcome="**purge failed** (name still taken)"
                 status=1
               fi
               break
@@ -265,9 +278,33 @@ jobs:
               sleep 30
             fi
           done
-          if [[ "$purged" -eq 0 && "$vault_checked" -eq 1 && "$status" -eq 0 ]]; then
+          if [[ "$purged" -eq 0 && "$vault_checked" -eq 1 && "$vault_outcome" == "not checked" ]]; then
             echo "Key Vault $VAULT_NAME is not soft-deleted; nothing to purge."
+            vault_outcome="not soft-deleted (already purged, or never existed)"
           fi
+
+          # The run summary: one table answering "is this environment gone and can I
+          # deploy again?", which is the only question this workflow exists to
+          # answer. The per-check state reports were appended above by
+          # check-state.sh --summary.
+          if [[ "$gone" -eq 1 ]]; then
+            rg_outcome="deleted (confirmed after ~$gone_after_minutes min)"
+          else
+            rg_outcome="**still exists**"
+          fi
+          verify_outcome="passed"
+          if [[ "$status" -ne 0 ]]; then
+            verify_outcome="**failed**"
+          fi
+          summary ""
+          summary "## Teardown verify — ${rg_name}"
+          summary ""
+          summary "| Check | Outcome |"
+          summary "| --- | --- |"
+          summary "| Resource group | ${rg_outcome} |"
+          summary "| Key Vault \`${VAULT_NAME}\` | ${vault_outcome:-not checked} |"
+          summary "| Verify step | ${verify_outcome} |"
+          summary "| Started | ${started_at} UTC |"
 
           exit "$status"
 

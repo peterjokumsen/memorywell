@@ -186,21 +186,24 @@ slow — recreate it with `./scripts/deploy-shared.sh`.
    decision, and touch nothing in Azure.
 2. Run again with `dry_run: false`. Expect the RG delete, then a **Verify**
    step that polls `az group show` every 20 s for up to 30 min until the group
-   is gone. Once up front and then every 10 min it also prints
+   is gone. Once up front and then every 10 min it also runs
    `check-state.sh --rg rg-memwell-dev` — the group's provisioning state and its
    resources' states — so a long drain shows _what_ it is waiting on rather
    than just "still exists". That report is informational: if it cannot be
-   produced, the run logs a warning and the poll carries on. Only `step` lines
-   are annotated; the vault wait sits inside a collapsible group — expand it
-   only when it fails.
-3. The vault is settled in two places, because it only becomes visible as
+   produced, the run logs a warning and the poll carries on.
+3. **Read the run summary, not the log.** Both steps write to the run summary
+   page: milestones as `##` headings, outcomes and problems as bullets, a state
+   table per poll, and a closing table answering "is this environment gone and
+   can I deploy again?". The vault wait sits inside a collapsible group in the
+   log — expand it only when it fails.
+4. The vault is settled in two places, because it only becomes visible as
    soft-deleted _after_ the group is gone: `teardown.sh` waits up to 5 min for
    it and purges it, and **Verify** waits up to 5 more and purges it if it
    turned up in the meantime. A purge there is success, not failure — the next
    deploy needs the name free.
-4. Confirm in the portal that `rg-memwell-dev` is gone and
+5. Confirm in the portal that `rg-memwell-dev` is gone and
    `rg-memwell-shared` still exists.
-5. Confirm the next `./scripts/deploy.sh` succeeds — that is the real proof the
+6. Confirm the next `./scripts/deploy.sh` succeeds — that is the real proof the
    vault was purged (an un-purged vault blocks the same name).
 
 ## 4. Pausing / operating
@@ -230,8 +233,8 @@ slow — recreate it with `./scripts/deploy-shared.sh`.
 
 - `scripts/teardown.sh` — the script this workflow calls (flags: `--purge-vault`, `--shared`)
 - `scripts/common.sh` — naming rules (`rg-<base>-<env>`, `kv-<base>-<env>`, `rg-<base>-shared`); these are the single source of truth, since `infra/main.bicepparam` reads the exported `VAULT_NAME`/`RG_NAME`/`SHARED_RG_NAME` env vars rather than rebuilding names itself
-- `scripts/_log.sh` + `scripts/_log-local.sh` / `scripts/_log-ghactions.sh` — the script loggers (sourced, not run). Under Actions (`GITHUB_ACTIONS=true`) the GitHub backend is picked automatically: `step` becomes a `::notice::` milestone, `warn`/`error` become annotations, and retry loops sit inside collapsible `group`/`endgroup` sections, while `info`/`success` stay plain text (annotating routine progress buried the messages that matter). Both backends print to stderr, so nothing lands in the `$(...)` captures the scripts rely on. Force one locally with `LOG_FORMAT=github ./scripts/teardown.sh` to preview CI output, or `LOG_FORMAT=local` to override the automatic pick
+- `scripts/_log.sh` + `scripts/_log-local.sh` / `scripts/_log-ghactions.sh` — the script loggers (sourced, not run). Under Actions (`GITHUB_ACTIONS=true`) the GitHub backend is picked automatically and every level is written **twice**: to the step's text log, and to the workflow run summary (`$GITHUB_STEP_SUMMARY`), which renders above the log. `step` becomes a `##` heading, `warn`/`error` are summary bullets _and_ annotations (annotations alone render as isolated one-liners), `success` is a summary bullet, `info` stays log-only so the summary does not drown in it. The Verify step adds a per-poll state table and a closing outcome table to the same summary. Both backends print to stderr, so nothing lands in the `$(...)` captures the scripts rely on. Force one locally with `LOG_FORMAT=github ./scripts/teardown.sh` to preview CI output (with `GITHUB_STEP_SUMMARY=/tmp/sum.md` to see the summary), or `LOG_FORMAT=local` to override the automatic pick
 - `scripts/_azure.sh` — shared `az` helpers (`subscription_name`, `group_exists`, `fetch_deployment_outputs`, vault probes)
-- `scripts/check-state.sh --rg <name>` — single-group report used by the **Verify** step for progress: the group's provisioning state and its resources' states, no command traces, no log files. Exit code carries the verdict (0 gone, 1 not Succeeded, 2 all Succeeded, 64 usage error). Useful on its own after a partial deploy: `./scripts/check-state.sh --rg rg-memwell-dev`
+- `scripts/check-state.sh --rg <name>` — single-group report used by the **Verify** step for progress: the group's provisioning state and its resources' states, no command traces, no log files. Exit code carries the verdict (0 gone, 1 not Succeeded, 2 all Succeeded, 64 usage error). Useful on its own after a partial deploy: `./scripts/check-state.sh --rg rg-memwell-dev`; add `--summary` to have it contribute a markdown table to the run summary
 - `logs/<script>-<timestamp>_{commands,stdout,stderr}.log` — written by `init_command_log`: the `+ az …` traces, command stdout, and command stderr, as three separate files. Probes whose console output is hidden are still recorded, and command output captured by `$(...)` lands here rather than on the console. The run uploads them as the `script-logs-<env>` artifact (`if: always()`, 7-day retention), so a failed run stays diagnosable after the runner is gone
 - `docs/PLAN.md` § Cost & safety — the cost model this workflow protects
