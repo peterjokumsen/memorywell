@@ -64,5 +64,17 @@ resource clientFirewallRule 'Microsoft.DBforPostgreSQL/flexibleServers/firewallR
 output serverName string = server.name
 output serverFqdn string = server.properties.fullyQualifiedDomainName
 output databaseName string = database.name
+
+// A postgresql:// URL, not the ADO.NET `Host=…;Port=…` form. psycopg3 accepts
+// only a URI or libpq keyword/value conninfo (`host=`, `dbname=`, …); handed the
+// ADO string it fails with `invalid connection option "Host"`. The URL also
+// matches how the value is used everywhere: `psycopg.connect(URL)`. Same reason
+// redis.bicep emits rediss:// instead of an Azure key string.
+//
+// uriComponentToString() percent-encodes login and password. The password comes
+// from .env, so it can hold `@ : / ? #` — unescaped those truncate the URL into
+// a wrong host and a silent auth failure rather than an error at parse time.
+// sslmode=require states what the server enforces anyway: Azure PG rejects
+// non-TLS connections, and psycopg's `prefer` default leaves that to negotiation.
 @secure()
-output connectionString string = 'Host=${server.properties.fullyQualifiedDomainName};Port=5432;Database=${database.name};Username=${administratorLogin};Password=${administratorPassword}'
+output connectionString string = 'postgresql://${uriComponentToString(administratorLogin)}:${uriComponentToString(administratorPassword)}@${server.properties.fullyQualifiedDomainName}:5432/${database.name}?sslmode=require'
