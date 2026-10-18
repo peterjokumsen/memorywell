@@ -91,7 +91,7 @@ resource containerApp 'Microsoft.App/containerApps@2025-07-01' = {
               secretRef: env.postgresConnKey
             }
             {
-              name: 'REDIS_CONNECTION_STRING'
+              name: 'REDIS_URL'
               secretRef: env.redisConnKey
             }
           ]

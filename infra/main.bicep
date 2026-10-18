@@ -12,9 +12,11 @@ param sharedResourceGroupName string
 param acrName string
 param keyVaultName string
 param postgresClientIp string
+param postgresKeyName string
 param cosmosAccountName string
 param cosmosDatabase string
 param cosmosPrincipalObjectId string
+param redisKeyName string
 
 @secure()
 param postgresAdministratorPassword string
@@ -33,6 +35,10 @@ var globalInputs GlobalInputs = {
     ? postgresClientIp
     : fail('postgresClientIp is not set or has length less than 8')
   cosmosPrincipalObjectId: cosmosPrincipalObjectId
+  keys: {
+    postgres: !empty(postgresKeyName) ? postgresKeyName : fail('postgresSecretKey is not set')
+    redis: !empty(redisKeyName) ? redisKeyName : fail('redisSecretKey is not set')
+  }
 }
 
 var tags = {

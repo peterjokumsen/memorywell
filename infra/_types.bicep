@@ -2,6 +2,14 @@
 type EnvironmentType = 'dev' | 'test' | 'prod'
 
 @export()
+type SecretKeys = {
+  @description('Key used for Postgres connection string')
+  postgres: string
+  @description('Key used for Redis connection string')
+  redis: string
+}
+
+@export()
 type GlobalInputs = {
   @description('Name of ACR')
   acrName: string
@@ -24,4 +32,7 @@ type GlobalInputs = {
   cosmosDatabase: string
   @description('Object id of a developer principal granted Cosmos data-plane access for local tooling. Pass an empty string to skip the grant.')
   cosmosPrincipalObjectId: string
+
+  @description('Collection of keys used in Key Vault')
+  keys: SecretKeys
 }

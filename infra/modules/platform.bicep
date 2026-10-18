@@ -39,13 +39,13 @@ module redis 'redis.bicep' = {
   }
 }
 
-var redisConnKey = 'redis-connection-string'
+var redisConnKey = inputs.global.keys.redis
 module redisConnectionString 'secret.bicep' = {
   name: '${deployment().name}-redis-conn'
   params: {
     inputs: inputs
     secretName: redisConnKey
-    secretValue: redis.outputs.connectionString
+    secretValue: redis.outputs.connectionUrl
   }
 }
 
@@ -58,7 +58,7 @@ module postgres 'postgres.bicep' = {
   }
 }
 
-var postgresConnKey = 'postgres-connection-string'
+var postgresConnKey = inputs.global.keys.postgres
 module postgresConnectionString 'secret.bicep' = {
   name: '${deployment().name}-postgres-conn'
   params: {
@@ -83,8 +83,8 @@ module containerApp 'containerapp.bicep' = {
       cosmosDatabase: cosmos.outputs.databaseName
       cosmosEndpoint: cosmos.outputs.accountEndpoint
       keyVaultUri: keyVault.outputs.keyVaultUri
-      postgresConnKey: postgresConnKey
-      redisConnKey: redisConnKey
+      postgresConnKey: postgresConnectionString.outputs.keyName
+      redisConnKey: redisConnectionString.outputs.keyName
     }
   }
 }
