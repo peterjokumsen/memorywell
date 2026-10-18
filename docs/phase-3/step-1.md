@@ -22,6 +22,8 @@ Functions, no secrets wiring beyond what already exists.
   `maxDeliveryCount` (e.g. 10) and a lock duration (e.g. 30s). No
   retry-forever.
 
+Naming decision: topic to have `{domain}.{event}` and subscriptions to be based on purpose (`memory-writer`, `memory-digest`, `guardian-review`)
+
 ## Stub shape (write it yourself, keep it small)
 
 ```bicep
@@ -39,11 +41,13 @@ need topics + subscriptions (fan-out), use **Standard** SKU. Record the cost
 trade-off and the SKU you chose. (This is the kind of gotcha to hit and
 document.)
 
+> Chosen `Standard` SKU to use topics
+
 ## Verify
 
-- [ ] `az servicebus namespace show` → state `Active`, SKU as chosen.
-- [ ] Queue + topic + ≥3 subscriptions listed; each has DLQ enabled.
-- [ ] Publish a test message by hand (portal or `az servicebus queue message send`)
+- [x] `az servicebus namespace show` → state `Active`, SKU as chosen.
+- [x] Queue + topic + ≥3 subscriptions listed; each has DLQ enabled.
+- [x] Publish a test message by hand (portal or `az servicebus queue message send`)
       and confirm it appears; delete it after.
-- [ ] Module tagged; exports `namespaceName` / `queueName` / `topicName` for
+- [x] Module tagged; exports `namespaceName` / `queueName` / `topicName` for
       wiring in step 6.

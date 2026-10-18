@@ -93,6 +93,13 @@ module containerApp 'containerapp.bicep' = if (!databaseOnly) {
   }
 }
 
+module serviceBus 'servicebus.bicep' = {
+  name: '${deployment().name}-sb'
+  params: {
+    inputs: inputs
+  }
+}
+
 output appName string = containerApp.?outputs.appName ?? nullDefault
 output fqdn string = containerApp.?outputs.fqdn ?? nullDefault
 output redisHostName string = redis.?outputs.hostName ?? nullDefault
