@@ -7,7 +7,7 @@
 
 - Changes land via branch + PR into `main` (precedent: #1). Do not push to `main` directly.
 - After checkout run `pre-commit install` once; hooks run on `git commit` and only touch staged files. Never `pre-commit run --all-files` except for a deliberate baseline.
-- `.github/workflows/ci.yml` is the merge gate (pre-commit, `pytest`, `az bicep build`, `bash -n`). Every PR into `main` must be green; fix locally first (`pytest` in `api/`, `./scripts/validate-bicep.sh`).
+- `.github/workflows/ci.yml` is the merge gate (pre-commit, `pytest`, `az bicep build`, `bash -n`, `./scripts/check-logging.sh`). Every PR into `main` must be green; fix locally first (`pytest` in `api/`, `./scripts/validate-bicep.sh`, `./scripts/check-logging.sh`).
 
 ## Build mode: learning-first, agent-guided
 

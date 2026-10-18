@@ -57,15 +57,21 @@ _gh_escape_prop() {
 #
 #   step    -> `## heading` + plain log    (milestone)
 #   success -> summary bullet + plain log  (outcome)
-#   info    -> plain log only              (chattiest; would flood the summary)
+#   info    -> summary bullet + plain log  (chatter; use it for the narrative)
 #   warn    -> summary bullet + ::warning::
 #   error   -> summary bullet + ::error::
 #   debug   -> ::debug:: (only with step debug logging on)
+#   group   -> <details> block + ::group::  (verbose stretch, collapsed)
 #
 # A step is the one level that gets a real markdown heading, because that is
 # what the summary is scanned for: the milestones of the run as an outline, with
 # the outcomes and problems as bullets underneath. The rest would all be bullets
 # otherwise, which is a list with no shape.
+#
+# A group is the one level that is *not* a bullet: the log collapses it, so the
+# summary should too — a <details> block keeps the same narrative without
+# burying the run's outline under a retry loop's worth of chatter. Its bullets
+# nest inside the block, since they are emitted between group and endgroup.
 #
 # Summary lines are flattened to one line each, so a message containing a
 # newline cannot break the list item or the heading.
@@ -74,8 +80,35 @@ _summary_line() {
   if [[ -z "${GITHUB_STEP_SUMMARY:-}" ]]; then
     return 0
   fi
+  case "$label" in
+    section) _summary_section "$message"; return 0 ;;
+    end_section) _summary_section_end; return 0 ;;
+  esac
   message="${message//$'\n'/ }"
   printf -- '- **%s** %s\n' "$label" "$message" >> "$GITHUB_STEP_SUMMARY"
+}
+
+# _summary_section <title> / _summary_section_end: open and close the collapsible
+# block for a group. The title is markdown-escaped (only `&`, `<`, `>` can break
+# out of the <summary> element) and flattened, like every other summary line.
+# Blank lines around the markup are required: without one GitHub renders the
+# contents as raw text instead of markdown, and an unterminated block would
+# swallow the rest of the summary. Both writes are single printf calls so a
+# block can never be half-open — a group that is not closed by endgroup still
+# ends at the end of the step's summary.
+_summary_section() {
+  local title="${1//$'\n'/ }"
+  # Quote every replacement: an unquoted `&` in a bash pattern substitution is
+  # the matched text, so `&lt;` would expand to `<lt;` and silently unescape the
+  # very character it is meant to encode.
+  title="${title//&/'&amp;'}"
+  title="${title//</'&lt;'}"
+  title="${title//>/'&gt;'}"
+  printf '\n<details>\n<summary>%s</summary>\n\n' "$title" >> "$GITHUB_STEP_SUMMARY"
+}
+
+_summary_section_end() {
+  printf '\n</details>\n\n' >> "$GITHUB_STEP_SUMMARY"
 }
 
 # Leading blank line: a heading needs one before it, or markdown keeps it inside
@@ -108,13 +141,20 @@ error() {
 # "Enable debug logging" workflow setting).
 debug() { _log_stderr "::debug::$(_gh_escape_data "$*")"; }
 
-info() { _log_stderr "$*"; }
+info() {
+  _summary_line "info" "$*"
+  _log_stderr "$*"
+}
 
-# group/endgroup bracket a verbose section. The start is a summary bullet so the
-# collapsed section is still visible as a heading there; the end is not worth a
-# line of its own.
+# group/endgroup bracket a verbose section. Both ends matter twice: ::group::
+# collapses the log, <details> collapses the summary, and both need closing —
+# an unbalanced pair swallows the rest of the step (log) or of the summary
+# (details). Always pair them, never wrap a $(...) capture.
 group() {
   _summary_line "section" "$*"
   _log_stderr "::group::$(_gh_escape_data "$*")"
 }
-endgroup() { _log_stderr '::endgroup::'; }
+endgroup() {
+  _summary_line "end_section" ""
+  _log_stderr '::endgroup::'
+}

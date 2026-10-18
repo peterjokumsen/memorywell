@@ -57,6 +57,27 @@ else
   info "Resource group $RG_NAME not found; skipping delete."
 fi
 
+# Was $VAULT_NAME live before the delete above? After it there is no way to tell
+# "the vault is still coming" from "there was no vault": a vault that was purged
+# in an earlier run (or one the group never had) never appears in `list-deleted`,
+# so wait_for_soft_deleted_vault below would burn its whole budget and then fail
+# the teardown for a vault that does not exist. One probe, taken while the vault
+# still answers, settles which of the two this is — and it is only needed when a
+# purge was asked for, so runs without --purge-vault pay nothing for it.
+VAULT_WAS_LIVE=0
+if [[ "$PURGE_VAULT" == "1" ]]; then
+  # No `2>/dev/null` here: a redirect on run/itself swallows the `+ az …`
+  # trace it prints to stderr. run_hide_stderr already keeps the probe's own
+  # stderr (which is expected to fail, and belongs in the log) off the console;
+  # only its stdout — a JSON blob — is discarded.
+  if run_hide_stderr az keyvault show --name "$VAULT_NAME" >/dev/null; then
+    VAULT_WAS_LIVE=1
+    info "Key Vault $VAULT_NAME is live now; waiting for it to reach soft-deleted after the delete."
+  else
+    info "Key Vault $VAULT_NAME was not live before the delete (already purged, or never existed)."
+  fi
+fi
+
 # Key Vault uses soft-delete: after the RG is gone the vault lingers in
 # "deleted" state and blocks same-name redeploy. Purge is opt-in via
 # --purge-vault because the RG delete is async (--no-wait) and the vault may
@@ -67,9 +88,10 @@ fi
 # being deleted) but `list-deleted` does not list it yet. Concluding "no vault,
 # nothing to purge" there is wrong — minutes later the vault does surface as
 # soft-deleted, which is exactly what the workflow's Verify step then trips
-# over. So: when this run deleted the group, wait for the vault to surface
-# instead of deciding early. Only when there was no group to delete can a
-# missing vault mean "already purged in an earlier run".
+# over. So: when this run deleted a group that held a live vault, wait for the
+# vault to surface instead of deciding early. When the group was absent, or held
+# no live vault, a missing vault does mean "already purged in an earlier run" —
+# and VAULT_WAS_LIVE above is what keeps those two cases apart.
 wait_for_soft_deleted_vault() {
   local attempt=1
   local wait_minutes="${VAULT_PURGE_WAIT_MINUTES:-10}"
@@ -95,7 +117,10 @@ wait_for_soft_deleted_vault() {
 }
 
 if [[ "$PURGE_VAULT" == "1" ]]; then
-  if [[ "$ENV_RG_EXISTS" == "true" ]]; then
+  # Wait only when this run deleted a group that held a live vault. Any other
+  # route falls through to the soft-delete probe, which is the correct answer
+  # for both "no group to delete" and "the vault was never there".
+  if [[ "$ENV_RG_EXISTS" == "true" && "$VAULT_WAS_LIVE" == "1" ]]; then
     # This run deleted the group, so the vault's fate is still being decided.
     if wait_for_soft_deleted_vault; then
       step "Purging soft-deleted Key Vault $VAULT_NAME..."
@@ -113,7 +138,7 @@ if [[ "$PURGE_VAULT" == "1" ]]; then
     run az keyvault purge --name "$VAULT_NAME"
     success "Key Vault $VAULT_NAME purged."
   else
-    success "No resource group to delete and $VAULT_NAME is neither live nor soft-deleted; assuming it was already purged."
+    success "Key Vault $VAULT_NAME is neither live nor soft-deleted; nothing to purge (already purged in an earlier run, or never existed)."
   fi
 else
   info "Skipping Key Vault purge (pass --purge-vault to purge $VAULT_NAME for same-name redeploy)."
