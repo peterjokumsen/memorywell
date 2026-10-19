@@ -6,10 +6,14 @@ DLQ resubmit/monitor path. No transcription/STT or Guardian scoring logic.
 
 ## Triggers
 
-- `sb_transcription`: trigger on `transcription-jobs` queue. Stub logs the
+- `sb_transcription`: trigger on `transcription` queue (as built; earlier drafts
+  said `transcription-jobs`). Stub logs the
   message body and completes. Real STT + transcript write lands in Phase 6.
-- `sb_guardian`: trigger on the `guardian-sub` subscription of `memory-events`
-  topic. Stub logs and completes. Real scoring lands in Phase 4c.
+- `sb_guardian`: trigger on the `guardian-review` subscription of the
+  `memory.recorded` topic (as built; earlier drafts said `guardian-sub` on
+  `memory-events`). Stub logs and completes. Real scoring lands in Phase 4c.
+
+Event inventory (emitter/consumer/purpose): [`docs/EVENTS.md`](../EVENTS.md).
 
 Both must use the Functions Service Bus extension binding; configure the
 connection via app setting (managed identity preferred — `azure-identity` +
@@ -27,9 +31,9 @@ message peek` / resubmit commands.
 
 ## Verify
 
-- [ ] Send a message to `transcription-jobs`; the `sb_transcription` stub
+- [ ] Send a message to `transcription`; the `sb_transcription` stub
       logs it and completes; queue depth returns to 0.
 - [ ] Force a failure (raise in stub behind a flag) and confirm the message
       reaches the DLQ after max deliveries; then resubmit and confirm it drains.
-- [ ] `guardian-sub` receives a published `memory.recorded` event and the
+- [ ] `guardian-review` receives a published `memory.recorded` event and the
       stub logs it.

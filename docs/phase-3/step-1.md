@@ -7,9 +7,10 @@ Functions, no secrets wiring beyond what already exists.
 
 ## Topology (decide and record)
 
-- **Queue**: `transcription-jobs` — one message per voice note; consumed by the
-  transcription worker (Phase 6). Use a queue (not a topic) because there is
-  exactly one consumer and ordering/lock semantics matter.
+- **Queue**: `transcription` (as built; earlier drafts said `transcription-jobs`)
+  — one message per voice note; consumed by the transcription worker (Phase 6).
+  Use a queue (not a topic) because there is exactly one consumer and
+  ordering/lock semantics matter.
 - **Topic**: `memory-events` (or `memory.recorded`-style name; pick one and
   document it) with subscriptions:
   - `embedding-sub` — Cosmos change feed complement / embedding refresh.
@@ -23,6 +24,10 @@ Functions, no secrets wiring beyond what already exists.
   retry-forever.
 
 Naming decision: topic to have `{domain}.{event}` and subscriptions to be based on purpose (`memory-writer`, `memory-digest`, `guardian-review`)
+
+Resolved as built: one topic per event — `memory.recorded`, `memory.flagged`,
+`alias.requested`, `alias.updated` — each with purpose-named subscriptions;
+queue `transcription`. Full emitter/consumer/purpose catalog: [`docs/EVENTS.md`](../EVENTS.md).
 
 ## Stub shape (write it yourself, keep it small)
 

@@ -4,7 +4,7 @@
 for the app's domain events, with event subscriptions routing to Functions
 (stubs) and filters. No Service Bus changes, no Functions code.
 
-## Events (from `docs/PLAN.md`)
+## Events (from `docs/EVENTS.md` — central catalog; `docs/PLAN.md` §3 is source of truth)
 
 Custom events: `checkin.due`, `voice.received`, `memory.archived`,
 `memory.recorded`, `memory.flagged`, `alias.requested`, `alias.updated`.

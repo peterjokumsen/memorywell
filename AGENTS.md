@@ -34,6 +34,7 @@
 
 - Planned layout (`docs/PLAN.md` § Repo layout): `infra/ api/ functions/ web/ docs/ scripts/`. Scaffold only what the current phase brief needs.
 - Never assume the tree: check before planning or scaffolding (`git ls-tree --name-only origin/main`, `ls`). `infra/ api/ functions/ scripts/` exist; `web/` does not yet.
+- `docs/EVENTS.md` is the central event catalog (event, emitter, consumer, purpose). Any new/renamed event, subscription, queue, or trigger updates it in the same PR.
 - No pnpm workspace: when `web/` arrives (Phase 5), use a plain package manager inside `web/` only.
 - Azure-first on the AI-200 stack; IaC is Bicep.
 - Cheapest viable SKUs (Cosmos serverless, Postgres Burstable B1s, Redis Basic, Container Apps scale-to-zero, Functions consumption). Estimated ~$50–90/mo while running.

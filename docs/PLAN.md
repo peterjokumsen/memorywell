@@ -178,8 +178,9 @@ memorywell/
   functions/    Python Functions (timer check-ins/nudges, SB transcription worker,
                 SB guardian reviewer, change feed embeddings, HTTP invite claim, DLQ)
   web/          Frontend (Vite + React: Drop Zone, timeline, owner review queue)
-  docs/         architecture.md, AI-200 skills-to-components matrix, KQL queries
-  scripts/      provision-env.sh, teardown.sh, seed
+docs/         architecture.md, EVENTS.md (event catalog: emitter/consumer/purpose),
+                AI-200 skills-to-components matrix, KQL queries
+  scripts/      provision-env.sh, provision-all.sh, provision-shared.sh, publish-containers.sh, teardown.sh, seed
 ```
 
 ---
