@@ -7,11 +7,41 @@ set -euo pipefail
 # prepare environment variables
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/common.sh"
 
-# Validate args before touching Azure.
-ACTION="${1:-create}"
+# Parse arguments
+ACTION="create"
+BICEP_ONLY=0
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --action)
+      ACTION="${2:-}"
+      shift 2
+      ;;
+    --bicep-only)
+      BICEP_ONLY=1
+      shift
+      ;;
+    -h|--help)
+      echo "Usage: $0 [--action create|what-if] [--bicep-only]"
+      echo "  --action ACTION      Deployment action: create (default) or what-if"
+      echo "  --bicep-only         Stop after Bicep deployment; skip post-deployment verification"
+      exit 0
+      ;;
+    *)
+      error "Unknown argument: $1"
+      echo "Usage: $0 [--action create|what-if] [--bicep-only]" >&2
+      exit 1
+      ;;
+  esac
+done
+
 if [[ "$ACTION" != "create" && "$ACTION" != "what-if" ]]; then
-  error "${1-} is not a valid action"
-  echo "Usage: $0 [create|what-if]" >&2
+  error "$ACTION is not a valid action"
+  echo "Usage: $0 [--action create|what-if] [--bicep-only]" >&2
+  exit 1
+fi
+
+if [[ "$BICEP_ONLY" == "1" && "$ACTION" == "what-if" ]]; then
+  error "--bicep-only is not compatible with --action what-if"
   exit 1
 fi
 
@@ -66,6 +96,14 @@ run_deployment "$SHARED_RG_NAME" "$SHARED_DEPLOYMENT_NAME" "$ACTION" \
 
 if [[ "$ACTION" == "what-if" ]]; then
   success "What-if analysis completed. No changes were made."
+  exit 0
+fi
+
+if [[ "$BICEP_ONLY" == "1" ]]; then
+  success "Bicep deployment submitted. Stopping due to --bicep-only flag."
+  success "Run the following manually to verify completion:"
+  success "  az deployment sub show --name $SHARED_DEPLOYMENT_NAME --query properties.provisioningState -o tsv"
+  success "  az acr show -n $SHARED_ACR_NAME"
   exit 0
 fi
 
