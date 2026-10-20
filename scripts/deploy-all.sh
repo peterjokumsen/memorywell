@@ -49,12 +49,20 @@ fi
 init_command_log "deploy-all"
 
 step "Deploying shared resources..."
-if ! run "$SCRIPT_DIR/deploy-shared.sh" --action "$ACTION" $([[ "$BICEP_ONLY" == "1" ]] && echo "--bicep-only"); then
+shared_args=("--action" "$ACTION")
+if [[ "$BICEP_ONLY" == "1" ]]; then
+  shared_args+=("--bicep-only")
+fi
+if ! run "$SCRIPT_DIR/deploy-shared.sh" "${shared_args[@]}"; then
   error "Shared deployment failed; aborting before environment deployment."
   exit 1
 fi
 
 step "Deploying environment resources..."
-run "$SCRIPT_DIR/deploy.sh" --action "$ACTION" $([[ "$BICEP_ONLY" == "1" ]] && echo "--bicep-only")
+env_args=("--action" "$ACTION")
+if [[ "$BICEP_ONLY" == "1" ]]; then
+  env_args+=("--bicep-only")
+fi
+run "$SCRIPT_DIR/deploy.sh" "${env_args[@]}"
 
 success "All deployments completed successfully."
