@@ -11,6 +11,100 @@ later), **planned** (designed in a phase brief, not yet created).
 
 ---
 
+## Expected flow (diagram)
+
+The whole catalog as one picture: events ride labeled arrows between the two
+buses (shaded boxes) and their consumers. **Solid** = flow defined in
+`PLAN.md` / phase briefs (some phases still future); **dashed** = unresolved —
+see § Open gaps.
+
+```mermaid
+flowchart LR
+    subgraph clients["Clients"]
+        web["Web frontend<br/>Drop Zone · timeline · owner review queue"]
+    end
+
+    subgraph app["API + agents (api/)"]
+        api["API endpoints<br/>upload · conversation"]
+        prompter["Prompter (4a)<br/>cadence-aware questions"]
+        curator["Curator (4b)<br/>metadata + alias intent"]
+    end
+
+    subgraph fns["Azure Functions"]
+        timer["timer_cadence<br/>daily cadence sweep"]
+        stt["sb_transcription<br/>STT worker (P6)"]
+        sgb["sb_guardian<br/>Guardian scoring (4c)"]
+        cf["cosmos_changefeed<br/>embeddings (4b)"]
+        httpf["http_invite_claim<br/>magic-link claim"]
+    end
+
+    subgraph eg["Event Grid — custom topic"]
+        egrid["domain events<br/>filters · retries · routing"]
+    end
+
+    subgraph sb["Service Bus namespace (Standard)"]
+        t_rec["topic memory.recorded"]
+        t_flag["topic memory.flagged"]
+        t_areq["topic alias.requested"]
+        t_aupd["topic alias.updated"]
+        q_trans["queue transcription"]
+        s_writer["sub memory-writer"]
+        s_digest["sub memory-digest"]
+        s_guard["sub guardian-review"]
+        dlt[["DLQ + resubmit path"]]
+    end
+
+    web -->|"text · photo submission"| api
+    api --> curator
+    curator -->|"canonical memory<br/>aliasAtWriteTime"| cosmos[("Cosmos DB<br/>memories · flags")]
+    curator -->|"memory.recorded"| t_rec
+    t_rec --> s_writer
+    t_rec --> s_digest
+    t_rec --> s_guard
+    s_writer -->|"embedding + index refresh"| pg[("Postgres pgvector<br/>RAG store")]
+    s_digest -->|"digest rollups (P8)"| dig["digest generator (P8)"]
+    s_guard --> sgb
+    sgb -->|"pass"| acc["accepted — no flag"]
+    sgb -->|"flag: reason + score"| t_flag
+    t_flag -.->|"no subscription yet (gap 1)"| review["owner review queue"]
+    review -->|"approve · edit · hide · dismiss"| web
+    review -->|"resolvedBy audit"| cosmos
+    curator -->|"alias.requested"| t_areq
+    t_areq --> s_guard
+    sgb -->|"alias valid → auto-apply"| t_aupd
+    sgb -->|"alias invalid → flag"| t_flag
+    t_aupd -->|"invalidate alias cache"| redis[("Redis<br/>alias lookups")]
+    t_aupd -->|"planned: confirm in next prompt"| prompter
+    t_aupd -->|"guardian-review (built)"| s_guard
+    timer -->|"checkin.due"| egrid
+    egrid -->|"checkin.due"| prompter
+    prompter -->|"question card"| web
+    web -->|"voice note upload"| blob[("Blob storage<br/>audio · photos")]
+    blob -->|"voice.received"| egrid
+    egrid -->|"voice.received"| q_trans
+    q_trans --> stt
+    stt -->|"transcript + audio link"| cosmos
+    cosmos -->|"change feed"| cf
+    cf -->|"embeddings"| pg
+    cf -->|"cache refresh"| redis
+    web -->|"invite claim"| httpf
+    httpf -->|"membership write"| cosmos
+    curator -.->|"mirrored domain events (gap 2)"| egrid
+    sgb -.->|"memory.flagged (gap 2)"| egrid
+    egrid -.->|"*-to-sb bridge (TBD)"| t_rec
+    egrid -.->|"memory-flagged-to-review"| review
+    egrid -.->|"memory.archived (gap 3)"| arch[["emitter + consumer TBD"]]
+    q_trans -.->|"after maxDeliveryCount"| dlt
+    s_guard -.->|"after maxDeliveryCount"| dlt
+    dlt -.->|"peek + resubmit"| q_trans
+```
+
+The DLQ path is drawn only for the `transcription` queue and `guardian-review`
+subscription to keep the graph readable — every queue and subscription behaves
+the same way.
+
+---
+
 ## Naming conventions
 
 - **Topics**: one Service Bus topic per event, named `{domain}.{event}`
