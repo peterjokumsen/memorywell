@@ -4,11 +4,41 @@ set -euo pipefail
 # prepare environment variables
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/common.sh"
 
-# Validate args before touching Azure.
-ACTION="${1:-create}"
+# Parse arguments
+ACTION="create"
+BICEP_ONLY=0
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --action)
+      ACTION="${2:-}"
+      shift 2
+      ;;
+    --bicep-only)
+      BICEP_ONLY=1
+      shift
+      ;;
+    -h|--help)
+      echo "Usage: $0 [--action create|what-if] [--bicep-only]"
+      echo "  --action ACTION      Deployment action: create (default) or what-if"
+      echo "  --bicep-only         Stop after Bicep deployment; skip Docker build, container app update, and health checks"
+      exit 0
+      ;;
+    *)
+      error "Unknown argument: $1"
+      echo "Usage: $0 [--action create|what-if] [--bicep-only]" >&2
+      exit 1
+      ;;
+  esac
+done
+
 if [[ "$ACTION" != "create" && "$ACTION" != "what-if" ]]; then
-  error "${1-} is not a valid action"
-  echo "Usage: $0 [create|what-if]" >&2
+  error "$ACTION is not a valid action"
+  echo "Usage: $0 [--action create|what-if] [--bicep-only]" >&2
+  exit 1
+fi
+
+if [[ "$BICEP_ONLY" == "1" && "$ACTION" == "what-if" ]]; then
+  error "--bicep-only is not compatible with --action what-if"
   exit 1
 fi
 
@@ -175,6 +205,15 @@ run_deployment "$RG_NAME" "$DEPLOYMENT_NAME" "$ACTION" \
 
 if [[ "$ACTION" == "what-if" ]]; then
   success "What-if analysis completed. No changes were made."
+  exit 0
+fi
+
+if [[ "$BICEP_ONLY" == "1" ]]; then
+  success "Bicep deployment completed. Stopping due to --bicep-only flag."
+  success "Run the following manually to complete the deployment:"
+  success "  1. Build and push Docker image: az acr build -r \$(registry_name) -t api:\$ENVIRONMENT -t api:\$IMAGE_TAG \$ROOT/api"
+  success "  2. Update container app: az containerapp update --name <app-name> --resource-group $RG_NAME --image \$(login_server)/api:\$IMAGE_TAG"
+  success "  3. Verify health: curl https://<fqdn>/health"
   exit 0
 fi
 
