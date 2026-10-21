@@ -10,6 +10,7 @@
 #   ./scripts/check-state.sh                    full report, writes logs/
 #   ./scripts/check-state.sh --rg <name>        single-group report, no logs
 #   ... --rg <name> --summary                   + markdown for the run summary
+#   ./scripts/check-state.sh --auto             discover and check all rg-<base>-* groups
 #
 # --rg mode exists for the teardown workflow's Verify step, which reports on
 # one resource group while it drains: it prints nothing but the group's
@@ -23,14 +24,17 @@
 set -euo pipefail
 
 # prepare environment variables
+# shellcheck source=common.sh
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/common.sh"
 
 usage() {
   cat <<EOF
-Usage: $0 [--env-only] [--shared-only] [--rg <resource-group>] [--summary]
+Usage: $0 [--auto] [--env-only] [--shared-only] [--rg <resource-group>] [--summary]
 
-  --env-only            check only rg-<base>-\$ENVIRONMENT
-  --shared-only         check only rg-<base>-shared
+  --auto                discover and check all resource groups matching
+                        rg-\$BASE_NAME-* (default when no flags given)
+  --env-only            check only rg-\$BASE_NAME-\$ENVIRONMENT
+  --shared-only         check only rg-\$BASE_NAME-shared
   --rg <name>           report one resource group: its provisioning state and
                         its resources' states, nothing else. No command traces,
                         no log files; exit code 0=absent, 1=not Succeeded,
@@ -41,10 +45,11 @@ Usage: $0 [--env-only] [--shared-only] [--rg <resource-group>] [--summary]
 EOF
 }
 
-# Usage: check-state.sh [--env-only] [--shared-only] [--rg <name>]
-#   Default checks both resource groups. Flags limit the check to one side
-#   (e.g. --shared-only after deploy-shared.sh, --env-only after deploy.sh).
-#   --rg reports a single, named group instead (see usage above).
+# Usage: check-state.sh [--auto] [--env-only] [--shared-only] [--rg <name>]
+#   Default (no flags): auto-discover and check all rg-<base>-* groups.
+#   --auto: explicit auto-discovery mode.
+#   --env-only / --shared-only: limit to the environment or shared group.
+#   --rg: report a single, named group (teardown Verify step).
 if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
   usage
   exit 0
@@ -53,11 +58,14 @@ CHECK_ENV=1
 CHECK_SHARED=1
 RG_ONLY=""
 SUMMARY=0
+AUTO_DISCOVER=0
+EXPLICIT_MODE=0
 while [[ $# -gt 0 ]]; do
   arg="$1"
   case "$arg" in
-    --env-only) CHECK_SHARED=0 ;;
-    --shared-only) CHECK_ENV=0 ;;
+    --auto) AUTO_DISCOVER=1; EXPLICIT_MODE=1 ;;
+    --env-only) CHECK_SHARED=0; EXPLICIT_MODE=1 ;;
+    --shared-only) CHECK_ENV=0; EXPLICIT_MODE=1 ;;
     --summary) SUMMARY=1 ;;
     --rg)
       [[ $# -ge 2 ]] || {
@@ -67,8 +75,9 @@ while [[ $# -gt 0 ]]; do
       }
       RG_ONLY="$2"
       shift
+      EXPLICIT_MODE=1
       ;;
-    --rg=*) RG_ONLY="${arg#--rg=}" ;;
+    --rg=*) RG_ONLY="${arg#--rg=}"; EXPLICIT_MODE=1 ;;
     *)
       error "Unknown argument: $arg"
       usage >&2
@@ -77,6 +86,11 @@ while [[ $# -gt 0 ]]; do
   esac
   shift
 done
+
+# Default to auto-discovery when no explicit mode flags are given.
+if [[ "$EXPLICIT_MODE" -eq 0 ]]; then
+  AUTO_DISCOVER=1
+fi
 
 # --rg= with nothing after it would otherwise fall through to the full report,
 # silently ignoring the flag.
@@ -94,6 +108,12 @@ if [[ -n "$RG_ONLY" && ( "$CHECK_ENV" -eq 0 || "$CHECK_SHARED" -eq 0 ) ]]; then
 fi
 if [[ "$SUMMARY" -eq 1 && -z "$RG_ONLY" ]]; then
   error "--summary only applies to --rg"
+  usage >&2
+  exit 64
+fi
+# --auto and --env-only/--shared-only are mutually exclusive with --rg
+if [[ -n "$RG_ONLY" && "$AUTO_DISCOVER" -eq 1 ]]; then
+  error "--rg cannot be combined with --auto"
   usage >&2
   exit 64
 fi
@@ -229,6 +249,25 @@ collect_group() {
     OVERALL=1
     GROUP_DEP_TEXT[$label]="could not list deployments in $rg"
   fi
+}
+
+# discover_groups <name-prefix>: discovers all resource groups matching the
+# given prefix using `az group list`. Populates the global DISCOVERED_RGS array
+# with the names of matching groups. Returns 0 on success (even if no groups
+# found), 1 on CLI failure.
+discover_groups() {
+  local prefix="$1"
+  local rg_names
+  DISCOVERED_RGS=()
+  if ! rg_names=$(run az group list --query "[?starts_with(name, '${prefix}')].name" -o tsv); then
+    return 1
+  fi
+  if [[ -n "$rg_names" ]]; then
+    while IFS= read -r name; do
+      [[ -n "$name" ]] && DISCOVERED_RGS+=("$name")
+    done <<< "$rg_names"
+  fi
+  return 0
 }
 
 # check_group <rg-name> <label>: the narrated wrapper around collect_group.
@@ -400,39 +439,68 @@ if [[ -n "$RG_ONLY" ]]; then
   exit 1
 fi
 
-# Resolved once and reused in both headers below: it is an `az account show`
-# round-trip, and every caller only wants it for the log line.
-SUB_NAME="$(subscription_name)"
-
-log_vars \
-  "Subscription=$SUB_NAME ($SUBSCRIPTION_ID)" \
-  "Resource group=$RG_NAME" \
-  "Shared resource group=$SHARED_RG_NAME"
-
-ENV_SUB_ROWS=""
-ENV_SUB_OK=1
-SHARED_SUB_ROWS=""
-SHARED_SUB_OK=1
-
-if [[ "$CHECK_ENV" == "1" ]]; then
-  check_group "$RG_NAME" "environment"
-
-  step "Fetching environment subscription deployments..."
-  if ! fetch_sub_deployments "${BASE_NAME}-${ENVIRONMENT}-"; then
-    ENV_SUB_OK=0
-  else
-    ENV_SUB_ROWS="$SUB_ROWS"
+# Auto-discovery mode: find all rg-<base>-* groups and check each.
+if [[ "$AUTO_DISCOVER" -eq 1 ]]; then
+  step "Discovering resource groups matching rg-${BASE_NAME}-*..."
+  if ! discover_groups "rg-${BASE_NAME}-"; then
+    error "Failed to list resource groups"
+    exit 1
   fi
-fi
 
-if [[ "$CHECK_SHARED" == "1" ]]; then
-  check_group "$SHARED_RG_NAME" "shared"
+  if [[ ${#DISCOVERED_RGS[@]} -eq 0 ]]; then
+    info "No resource groups found matching rg-${BASE_NAME}-*"
+    success "Check complete: nothing deployed yet."
+    exit 0
+  fi
 
-  step "Fetching shared subscription deployments..."
-  if ! fetch_sub_deployments "${BASE_NAME}-shared-"; then
-    SHARED_SUB_OK=0
-  else
-    SHARED_SUB_ROWS="$SUB_ROWS"
+  info "Found ${#DISCOVERED_RGS[@]} group(s): ${DISCOVERED_RGS[*]}"
+  log_vars "Subscription=$(subscription_name) ($SUBSCRIPTION_ID)" "Discovered groups=${DISCOVERED_RGS[*]}"
+
+  # Check each discovered group
+  label_idx=0
+  for rg in "${DISCOVERED_RGS[@]}"; do
+    label="auto-${label_idx}"
+    check_group "$rg" "$label"
+    ((label_idx++))
+  done
+
+  # No subscription deployment fetching in auto mode — we don't know the prefixes
+else
+  # Resolved once and reused in both headers below: it is an `az account show`
+  # round-trip, and every caller only wants it for the log line.
+  SUB_NAME="$(subscription_name)"
+
+  # shellcheck disable=SC2153  # RG_NAME, SHARED_RG_NAME from common.sh
+  log_vars \
+    "Subscription=$SUB_NAME ($SUBSCRIPTION_ID)" \
+    "Resource group=$RG_NAME" \
+    "Shared resource group=$SHARED_RG_NAME"
+
+  ENV_SUB_ROWS=""
+  ENV_SUB_OK=1
+  SHARED_SUB_ROWS=""
+  SHARED_SUB_OK=1
+
+  if [[ "$CHECK_ENV" == "1" ]]; then
+    check_group "$RG_NAME" "environment"
+
+    step "Fetching environment subscription deployments..."
+    if ! fetch_sub_deployments "${BASE_NAME}-${ENVIRONMENT}-"; then
+      ENV_SUB_OK=0
+    else
+      ENV_SUB_ROWS="$SUB_ROWS"
+    fi
+  fi
+
+  if [[ "$CHECK_SHARED" == "1" ]]; then
+    check_group "$SHARED_RG_NAME" "shared"
+
+    step "Fetching shared subscription deployments..."
+    if ! fetch_sub_deployments "${BASE_NAME}-shared-"; then
+      SHARED_SUB_OK=0
+    else
+      SHARED_SUB_ROWS="$SUB_ROWS"
+    fi
   fi
 fi
 
@@ -445,24 +513,38 @@ step "Report"
 # wrong, so the whole phase is one collapsible section in CI. The summary below
 # stays outside it and must remain the last thing printed.
 group "Report"
-log_vars \
-  "Subscription=$SUB_NAME ($SUBSCRIPTION_ID)" \
-  "Scope=$([[ "$CHECK_ENV" == "1" && "$CHECK_SHARED" == "1" ]] && echo 'environment + shared' || ([[ "$CHECK_ENV" == "1" ]] && echo 'environment only' || echo 'shared only'))"
 
-if [[ "$CHECK_ENV" == "1" ]]; then
-  report_group "environment" "$RG_NAME"
-fi
+if [[ "$AUTO_DISCOVER" -eq 1 ]]; then
+  log_vars \
+    "Subscription=$(subscription_name) ($SUBSCRIPTION_ID)" \
+    "Scope=auto-discovered (${#DISCOVERED_RGS[@]} group(s))"
 
-if [[ "$CHECK_SHARED" == "1" ]]; then
-  report_group "shared" "$SHARED_RG_NAME"
-fi
+  label_idx=0
+  for rg in "${DISCOVERED_RGS[@]}"; do
+    label="auto-${label_idx}"
+    report_group "$label" "$rg"
+    ((label_idx++))
+  done
+else
+  log_vars \
+    "Subscription=$SUB_NAME ($SUBSCRIPTION_ID)" \
+    "Scope=$(if [[ "$CHECK_ENV" == "1" && "$CHECK_SHARED" == "1" ]]; then echo 'environment + shared'; elif [[ "$CHECK_ENV" == "1" ]]; then echo 'environment only'; else echo 'shared only'; fi)"
 
-if [[ "$CHECK_ENV" == "1" ]]; then
-  report_sub_deployments "environment" "$ENV_SUB_ROWS" "$ENV_SUB_OK"
-fi
+  if [[ "$CHECK_ENV" == "1" ]]; then
+    report_group "environment" "$RG_NAME"
+  fi
 
-if [[ "$CHECK_SHARED" == "1" ]]; then
-  report_sub_deployments "shared" "$SHARED_SUB_ROWS" "$SHARED_SUB_OK"
+  if [[ "$CHECK_SHARED" == "1" ]]; then
+    report_group "shared" "$SHARED_RG_NAME"
+  fi
+
+  if [[ "$CHECK_ENV" == "1" ]]; then
+    report_sub_deployments "environment" "$ENV_SUB_ROWS" "$ENV_SUB_OK"
+  fi
+
+  if [[ "$CHECK_SHARED" == "1" ]]; then
+    report_sub_deployments "shared" "$SHARED_SUB_ROWS" "$SHARED_SUB_OK"
+  fi
 fi
 endgroup
 
