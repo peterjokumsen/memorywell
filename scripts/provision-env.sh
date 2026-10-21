@@ -40,7 +40,7 @@ while [[ $# -gt 0 ]]; do
       ;;
     *)
       error "Unknown argument: $1"
-      echo "Usage: $0 [--action create|what-if] [--bicep-only]" >&2
+      echo "Usage: $0 [--action create|what-if] [--bicep-only] [--deployment-mode all|container-apps|databases]" >&2
       exit 1
       ;;
   esac
@@ -48,7 +48,7 @@ done
 
 if [[ "$ACTION" != "create" && "$ACTION" != "what-if" ]]; then
   error "$ACTION is not a valid action"
-  echo "Usage: $0 [--action create|what-if] [--bicep-only]" >&2
+  echo "Usage: $0 [--action create|what-if] [--bicep-only] [--deployment-mode all|container-apps|databases]" >&2
   exit 1
 fi
 
@@ -208,6 +208,11 @@ log_vars \
   "Location=$LOCATION" \
   "Deployment=$DEPLOYMENT_NAME" \
   "ImageTag=$IMAGE_TAG"
+
+# Build and push function logger image to ACR BEFORE Bicep deployment
+# (platform.bicep's functionLogger Container App pulls it immediately)
+step "Building and pushing function logger image to ACR..."
+run az acr build -r "$(registry_name)" -t memorywell-functions:latest "$ROOT/functions"
 
 # run_deployment, not `run`: this call is silent for minutes at a time (ARM
 # returns nothing until the deployment finishes), so it reports what it is

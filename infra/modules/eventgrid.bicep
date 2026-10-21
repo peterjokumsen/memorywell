@@ -1,4 +1,4 @@
-import { ResourceGroupInputs } from './_types.bicep'
+import { EventGridFunctions, ResourceGroupInputs } from './_types.bicep'
 
 param inputs ResourceGroupInputs
 
@@ -25,7 +25,7 @@ resource domain 'Microsoft.EventGrid/domains@2025-02-15' = {
 // =====================================================================
 // Parameters for handler endpoints (populated from Function App outputs or App Config)
 // =====================================================================
-param functionEndpoints object = {
+param functionEndpoints EventGridFunctions = {
   timerCadence: '' // HTTP trigger for checkin.due
   voiceReceived: '' // HTTP trigger for voice.received
   memoryRecordedBridge: '' // Bridge to SB topic 'memory.recorded'
@@ -34,134 +34,117 @@ param functionEndpoints object = {
   aliasUpdatedBridge: '' // Bridge to SB topic 'alias.updated'
 }
 
-param serviceBusTopics object = {
-  memoryRecorded: 'memory.recorded'
-  memoryFlagged: 'memory.flagged'
-  aliasRequested: 'alias.requested'
-  aliasUpdated: 'alias.updated'
-}
-
 // Dead-letter storage (expect platform.bicep to output these)
 param deadLetterStorage object = {
   storageAccountId: ''
   containerName: 'eventgrid-dlq'
 }
 
-var defaultRetryPolicy = {
+var defaultRetryPolicy resourceInput<'Microsoft.EventGrid/domains/eventSubscriptions@2025-02-15'>.properties.retryPolicy = {
   maxDeliveryAttempts: 30
   eventTimeToLiveInMinutes: 1440 // 24h
-  retryPolicyType: 'ExponentialBackoff'
-  minRetryIntervalInMinutes: 5
-  maxRetryIntervalInMinutes: 60
+  //  retryPolicyType: 'ExponentialBackoff'
+  //  minRetryIntervalInMinutes: 5
+  //  maxRetryIntervalInMinutes: 60
 }
 
 // =====================================================================
 // Event subscriptions (one per event type, with filters + DLQ)
 // =====================================================================
 
-// checkin.due -> Prompter (direct)
-resource subCheckinDue 'Microsoft.EventGrid/domains/eventSubscriptions@2025-02-15' = if (!empty(functionEndpoints.timerCadence)) {
-  parent: domain
-  name: 'sub-checkin-due-prompter'
-  properties: {
-    destination: { endpointType: 'WebHook', properties: { endpointUrl: functionEndpoints.timerCadence } }
-    filter: {
-      includedEventTypes: ['checkin.due']
-      subjectBeginsWith: ''
-      subjectEndsWith: ''
-      isSubjectCaseSensitive: false
+type subDetails = {
+  name: string
+  isEnabled: bool
+  destination: resourceInput<'Microsoft.EventGrid/domains/eventSubscriptions@2025-02-15'>.properties.destination
+  filter: resourceInput<'Microsoft.EventGrid/domains/eventSubscriptions@2025-02-15'>.properties.filter
+  retryPolicy: resourceInput<'Microsoft.EventGrid/domains/eventSubscriptions@2025-02-15'>.properties.retryPolicy?
+}
+
+var subs subDetails[] = [
+  // checkin.due -> Prompter (direct)
+  {
+    name: 'checkin-due-prompter'
+    isEnabled: !empty(functionEndpoints.?timerCadence)
+    destination: {
+      endpointType: 'WebHook'
+      properties: { endpointUrl: functionEndpoints.?timerCadence }
     }
-    retryPolicy: defaultRetryPolicy
-    deadLetterDestination: !empty(deadLetterStorage.storageAccountId)
-      ? {
-          endpointType: 'StorageBlob'
-          properties: {
-            resourceId: deadLetterStorage.storageAccountId
-            blobContainerName: deadLetterStorage.containerName
-          }
-        }
-      : {}
-    eventDeliverySchema: 'EventGridSchema'
+    filter: { includedEventTypes: ['checkin.due'] }
   }
-}
-
-// voice.received -> transcription queue (direct)
-resource subVoiceReceived 'Microsoft.EventGrid/domains/eventSubscriptions@2025-02-15' = if (!empty(functionEndpoints.voiceReceived)) {
-  parent: domain
-  name: 'sub-voice-received-transcription'
-  properties: {
-    destination: { endpointType: 'WebHook', properties: { endpointUrl: functionEndpoints.voiceReceived } }
-    filter: {
-      includedEventTypes: ['voice.received']
-      subjectBeginsWith: ''
-      subjectEndsWith: ''
-      isSubjectCaseSensitive: false
+  // voice.received -> transcription queue (direct)
+  {
+    name: 'voice-received-transcription'
+    isEnabled: !empty(functionEndpoints.?voiceReceived)
+    destination: {
+      endpointType: 'WebHook'
+      properties: { endpointUrl: functionEndpoints.?voiceReceived }
     }
-    retryPolicy: defaultRetryPolicy
-    deadLetterDestination: !empty(deadLetterStorage.storageAccountId)
-      ? {
-          endpointType: 'StorageBlob'
-          properties: {
-            resourceId: deadLetterStorage.storageAccountId
-            blobContainerName: deadLetterStorage.containerName
+    filter: { includedEventTypes: ['voice.received'] }
+  }
+  // memory.recorded -> Service Bus bridge (fan-out via SB)
+  {
+    name: 'memory-recorded-to-sb'
+    isEnabled: !empty(functionEndpoints.?memoryRecordedBridge)
+    destination: {
+      endpointType: 'WebHook'
+      properties: { endpointUrl: functionEndpoints.?memoryRecordedBridge }
+    }
+    filter: { includedEventTypes: ['memory.recorded'] }
+  }
+  // memory.flagged -> Owner review queue (direct)
+  {
+    name: 'memory-flagged-to-review'
+    isEnabled: !empty(functionEndpoints.?memoryFlaggedReview)
+    destination: {
+      endpointType: 'WebHook'
+      properties: { endpointUrl: functionEndpoints.?memoryFlaggedReview }
+    }
+    filter: { includedEventTypes: ['memory.flagged'] }
+  }
+  // alias.requested -> Service Bus bridge (Guardian validation)
+  {
+    name: 'alias-requested-to-sb'
+    isEnabled: !empty(functionEndpoints.?aliasRequestedBridge)
+    destination: {
+      endpointType: 'WebHook'
+      properties: { endpointUrl: functionEndpoints.?aliasRequestedBridge }
+    }
+    filter: { includedEventTypes: ['alias.requested'] }
+  }
+  // alias.updated -> Service Bus bridge (cache invalidation + Prompter confirm)
+  {
+    name: 'alias-updated-to-sb'
+    isEnabled: !empty(functionEndpoints.?aliasUpdatedBridge)
+    destination: {
+      endpointType: 'WebHook'
+      properties: { endpointUrl: functionEndpoints.?aliasUpdatedBridge }
+    }
+    filter: { includedEventTypes: ['alias.updated'] }
+  }
+]
+
+var enabledSubs = filter(subs, s => s.isEnabled)
+
+resource eventSubs 'Microsoft.EventGrid/domains/eventSubscriptions@2025-02-15' = [
+  for sub in enabledSubs: {
+    parent: domain
+    name: sub.name
+    properties: {
+      destination: sub.destination
+      filter: sub.filter
+      retryPolicy: sub.?retryPolicy ?? defaultRetryPolicy
+      deadLetterDestination: !empty(deadLetterStorage.storageAccountId)
+        ? {
+            endpointType: 'StorageBlob'
+            properties: {
+              resourceId: deadLetterStorage.storageAccountId
+              blobContainerName: deadLetterStorage.containerName
+            }
           }
-        }
-      : {}
-    eventDeliverySchema: 'EventGridSchema'
+        : {}
+    }
   }
-}
-
-// memory.recorded -> Service Bus bridge (fan-out via SB)
-resource subMemoryRecordedBridge 'Microsoft.EventGrid/domains/eventSubscriptions@2025-02-15' = if !empty(functionEndpoints.memoryRecordedBridge) {
-  parent: domain
-  name: 'sub-memory-recorded-to-sb'
-  properties: {
-    destination: { endpointType: 'Webhook', properties: { endpointUrl: functionEndpoints.memoryRecordedBridge } }
-    filter: { includedEventTypes: ['memory.recorded'], subjectBeginsWith: '', subjectEndsWith: '', isSubjectCaseSensitive: false }
-    retryPolicy: defaultRetryPolicy
-    deadLetterDestination: !empty(deadLetterStorage.storageAccountId) ? { endpointType: 'StorageBlob', properties: { resourceId: deadLetterStorage.storageAccountId, blobContainerName: deadLetterStorage.containerName } } : {}
-    eventDeliverySchema: 'EventGridSchema'
-  }
-}
-
-// memory.flagged -> Owner review queue (direct)
-resource subMemoryFlaggedReview 'Microsoft.EventGrid/domains/eventSubscriptions@2025-02-15' = if !empty(functionEndpoints.memoryFlaggedReview) {
-  parent: domain
-  name: 'sub-memory-flagged-to-review'
-  properties: {
-    destination: { endpointType: 'Webhook', properties: { endpointUrl: functionEndpoints.memoryFlaggedReview } }
-    filter: { includedEventTypes: ['memory.flagged'], subjectBeginsWith: '', subjectEndsWith: '', isSubjectCaseSensitive: false }
-    retryPolicy: defaultRetryPolicy
-    deadLetterDestination: !empty(deadLetterStorage.storageAccountId) ? { endpointType: 'StorageBlob', properties: { resourceId: deadLetterStorage.storageAccountId, blobContainerName: deadLetterStorage.containerName } } : {}
-    eventDeliverySchema: 'EventGridSchema'
-  }
-}
-
-// alias.requested -> Service Bus bridge (Guardian validation)
-resource subAliasRequestedBridge 'Microsoft.EventGrid/domains/eventSubscriptions@2025-02-15' = if !empty(functionEndpoints.aliasRequestedBridge) {
-  parent: domain
-  name: 'sub-alias-requested-to-sb'
-  properties: {
-    destination: { endpointType: 'Webhook', properties: { endpointUrl: functionEndpoints.aliasRequestedBridge } }
-    filter: { includedEventTypes: ['alias.requested'], subjectBeginsWith: '', subjectEndsWith: '', isSubjectCaseSensitive: false }
-    retryPolicy: defaultRetryPolicy
-    deadLetterDestination: !empty(deadLetterStorage.storageAccountId) ? { endpointType: 'StorageBlob', properties: { resourceId: deadLetterStorage.storageAccountId, blobContainerName: deadLetterStorage.containerName } } : {}
-    eventDeliverySchema: 'EventGridSchema'
-  }
-}
-
-// alias.updated -> Service Bus bridge (cache invalidation + Prompter confirm)
-resource subAliasUpdatedBridge 'Microsoft.EventGrid/domains/eventSubscriptions@2025-02-15' = if !empty(functionEndpoints.aliasUpdatedBridge) {
-  parent: domain
-  name: 'sub-alias-updated-to-sb'
-  properties: {
-    destination: { endpointType: 'Webhook', properties: { endpointUrl: functionEndpoints.aliasUpdatedBridge } }
-    filter: { includedEventTypes: ['alias.updated'], subjectBeginsWith: '', subjectEndsWith: '', isSubjectCaseSensitive: false }
-    retryPolicy: defaultRetryPolicy
-    deadLetterDestination: !empty(deadLetterStorage.storageAccountId) ? { endpointType: 'StorageBlob', properties: { resourceId: deadLetterStorage.storageAccountId, blobContainerName: deadLetterStorage.containerName } } : {}
-    eventDeliverySchema: 'EventGridSchema'
-  }
-}
+]
 
 // memory.archived -> TBD (placeholder, enable when flow is defined)
 // resource subMemoryArchived 'Microsoft.EventGrid/domains/eventSubscriptions@2025-02-15' = if false { ... }

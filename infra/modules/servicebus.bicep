@@ -1,4 +1,4 @@
-import { ResourceGroupInputs } from './_types.bicep'
+import { ResourceGroupInputs, ServiceBusTopics } from './_types.bicep'
 
 param inputs ResourceGroupInputs
 
@@ -56,3 +56,9 @@ module subs 'servicebus-subs.bicep' = [
 output namespaceName string = ns.name
 output queueName string = queue.name
 output topicNames array = [for t in topicConfigs: t.name]
+output topics ServiceBusTopics = {
+  memoryRecorded: 'memory.recorded'
+  memoryFlagged: 'memory.flagged'
+  aliasRequested: 'alias.requested'
+  aliasUpdated: 'alias.updated'
+}
