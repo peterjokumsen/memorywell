@@ -7,6 +7,7 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/common.sh"
 # Parse arguments
 ACTION="create"
 BICEP_ONLY=0
+DEPLOYMENT_MODE="all"
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --action)
@@ -17,10 +18,24 @@ while [[ $# -gt 0 ]]; do
       BICEP_ONLY=1
       shift
       ;;
+    --deployment-mode)
+      DEPLOYMENT_MODE="${2:-}"
+      case "$DEPLOYMENT_MODE" in
+        "all" | "container-apps" | "databases")
+          shift 2
+          ;;
+        *)
+          error "Unknown --deployment-mode: $1"
+          echo "Expected: [all|container-apps|databases]"
+          exit 1
+          ;;
+      esac
+      ;;
     -h|--help)
-      echo "Usage: $0 [--action create|what-if] [--bicep-only]"
+      echo "Usage: $0 [--action create|what-if] [--bicep-only] [--deployment-mode all|container-apps|databases]"
       echo "  --action ACTION      Deployment action: create (default) or what-if"
-      echo "  --bicep-only         Stop after Bicep deployment; skip Docker build, container app update, and health checks"
+      echo "  --bicep-only         Stop after Bicep deployment; skip container image build/push and app update"
+      echo "  --deployment-mode    Deploy all environment variables or only container-apps/databases"
       exit 0
       ;;
     *)
@@ -42,14 +57,14 @@ if [[ "$BICEP_ONLY" == "1" && "$ACTION" == "what-if" ]]; then
   exit 1
 fi
 
-init_command_log "deploy"
+init_command_log "provision-env"
 
 # Get client IP and mint the timestamped deployment name + image tag
 # (lazy: sourcing common.sh alone reserves nothing; see deployment_name in common.sh).
 DEPLOYMENT_NAME="$(deployment_name)"
 IMAGE_TAG="$(image_tag)"
 CLIENT_IP="$(curl -s https://ifconfig.me)"
-export DEPLOYMENT_NAME IMAGE_TAG CLIENT_IP
+export DEPLOYMENT_NAME DEPLOYMENT_MODE IMAGE_TAG CLIENT_IP
 
 # Set the subscription context for Azure CLI commands
 run az account set --subscription "$SUBSCRIPTION_ID"
@@ -64,11 +79,11 @@ step "Checking shared resource group $SHARED_RG_NAME..."
 if ! SHARED_RG_STATE=$(run_hide_stderr az group show --name "$SHARED_RG_NAME" --query properties.provisioningState -o tsv); then
   if [[ "$ACTION" == "create" ]]; then
     info "Shared resource group $SHARED_RG_NAME not found; deploying it first..."
-    run "$SCRIPT_DIR/deploy-shared.sh" create
+    run "$SCRIPT_DIR/provision-shared.sh" create
   else
     error "Shared resource group $SHARED_RG_NAME not found; the shared ACR does not exist."
     error "Deploy it first (what-if never creates shared resources):"
-    error "  ./scripts/deploy-shared.sh create"
+    error "  ./scripts/provision-shared.sh create"
     exit 1
   fi
 elif [[ "$SHARED_RG_STATE" == "Deleting" ]]; then
@@ -81,11 +96,11 @@ step "Checking shared ACR $(registry_name) exists..."
 if ! run_quiet az acr show -n "$(registry_name)"; then
   if [[ "$ACTION" == "create" ]]; then
     info "Shared ACR $(registry_name) not found in $SHARED_RG_NAME; redeploying it first..."
-    run "$SCRIPT_DIR/deploy-shared.sh" create
+    run "$SCRIPT_DIR/provision-shared.sh" create
   else
     error "Shared ACR $(registry_name) not found in $SHARED_RG_NAME."
     error "Redeploy it with:"
-    error "  ./scripts/deploy-shared.sh create"
+    error "  ./scripts/provision-shared.sh create"
     exit 1
   fi
 fi
@@ -159,11 +174,11 @@ step "Checking if image exists in ACR..."
 # `api:<env>` tag can be missing (first deploy, or after a `--shared`
 # teardown). Fall back to the helloworld image in that case — the real image is
 # pushed by `az acr build` below (set -e does not trigger inside `if`).
-if run_hide_stderr az acr repository show-tags -n "$(registry_name)" --repository api | grep -q "$ENVIRONMENT"; then
-  success "  Image api:$ENVIRONMENT exists in ACR, using it for deployment."
-  IMAGE="$(login_server)/api:$ENVIRONMENT"
+if run_hide_stderr az acr repository show-tags -n "$(registry_name)" --repository api | grep -q "latest"; then
+  success "  Image api:latest exists in ACR, using it for deployment."
+  IMAGE="$(login_server)/api:latest"
 else
-  warn "  api:$ENVIRONMENT tag not found in $(registry_name), using default image for deployment."
+  warn "  api:latest tag not found in $(registry_name), using default image for deployment."
   IMAGE="mcr.microsoft.com/azuredocs/containerapps-helloworld:latest"
 fi
 export IMAGE
@@ -208,12 +223,10 @@ if [[ "$ACTION" == "what-if" ]]; then
   exit 0
 fi
 
-if [[ "$BICEP_ONLY" == "1" ]]; then
+if [[ "$BICEP_ONLY" == "1" || "$DEPLOYMENT_MODE" == "container-apps" ]]; then
   success "Bicep deployment completed. Stopping due to --bicep-only flag."
   success "Run the following manually to complete the deployment:"
-  success "  1. Build and push Docker image: az acr build -r \$(registry_name) -t api:\$ENVIRONMENT -t api:\$IMAGE_TAG \$ROOT/api"
-  success "  2. Update container app: az containerapp update --name <app-name> --resource-group $RG_NAME --image \$(login_server)/api:\$IMAGE_TAG"
-  success "  3. Verify health: curl https://<fqdn>/health"
+  success "  ./scripts/publish-containers.sh --update-apps"
   exit 0
 fi
 
@@ -338,28 +351,6 @@ if [[ "$(login_server)" != "$LOGIN_SERVER" ]]; then
   exit 1
 fi
 
-step "Building and pushing Docker image to ACR..."
-# Push both the floating env tag (keeps the Bicep pre-check working and marks
-# latest-stable) and the unique timestamp tag (guarantees a template-string
-# change so `containerapp update` mints a new revision every run).
-run az acr build -r "$REGISTRY" -t api:"$ENVIRONMENT" -t api:"$IMAGE_TAG" "$ROOT/api"
-
-step "Deploying container app..."
-run az containerapp update \
-  --name "$APP_NAME" \
-  --resource-group "$RG_NAME" \
-  --image "$LOGIN_SERVER/api:$IMAGE_TAG"
-
-step "Waiting for https://${FQDN}/health ..."
-attempt=1
-max_attempts=12 # ~60s: covers ACR pull + scale-from-zero on Consumption
-until run curl -sSf --max-time 5 "https://${FQDN}/health" | jq; do
-  if [[ "$attempt" -ge "$max_attempts" ]]; then
-    error "Health check failed after $max_attempts attempts."
-    exit 1
-  fi
-  warn "Attempt $attempt/$max_attempts failed, retrying in 5s..."
-  sleep 5
-  attempt=$((attempt + 1))
-done
-success "API is healthy at https://${FQDN}/health."
+success "Bicep deployment completed successfully."
+success "Run the following to build/push container images and update Container Apps:"
+success "  ./scripts/publish-containers.sh --update-apps"

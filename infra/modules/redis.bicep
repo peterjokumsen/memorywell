@@ -32,5 +32,5 @@ output hostName string = cache.properties.hostName
 // silently truncating the URL.
 @secure() // going to prod should use Entra ACL user instead of key: this bakes
 // the key in at deploy time, so a rotation breaks the connection until the next
-// deploy.sh. An Entra ACL user removes that and the secret with it.
+// provision-env.sh. An Entra ACL user removes that and the secret with it.
 output connectionUrl string = 'rediss://:${uriComponentToString(cache.listKeys().primaryKey)}@${cache.properties.hostName}:6380'

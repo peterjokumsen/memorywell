@@ -179,7 +179,7 @@ memorywell/
                 SB guardian reviewer, change feed embeddings, HTTP invite claim, DLQ)
   web/          Frontend (Vite + React: Drop Zone, timeline, owner review queue)
   docs/         architecture.md, AI-200 skills-to-components matrix, KQL queries
-  scripts/      deploy.sh, teardown.sh, seed
+  scripts/      provision-env.sh, teardown.sh, seed
 ```
 
 ---

@@ -76,7 +76,7 @@ class FakeCosmosContainer:
 
 
 class FakeCosmosDb:
-    """A database whose containers already exist, as they do after deploy.sh."""
+    """A database whose containers already exist, as they do after provision-env.sh."""
 
     def __init__(self, container_names: tuple[str, ...] = ()) -> None:
         self.containers = {name: FakeCosmosContainer(name) for name in container_names}

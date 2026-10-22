@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # One-time (per subscription) shared-resource deployment: the resource group
 # holding resources every environment shares, starting with the ACR.
-# Run before the first `deploy.sh`; `deploy.sh` fails fast if this is missing.
+# Run before the first `provision-env.sh`; `provision-env.sh` fails fast if this is missing.
 set -euo pipefail
 
 # prepare environment variables
@@ -19,6 +19,9 @@ while [[ $# -gt 0 ]]; do
     --bicep-only)
       BICEP_ONLY=1
       shift
+      ;;
+    --deployment-mode)
+      shift # deployment-mode can be ignored for this script.
       ;;
     -h|--help)
       echo "Usage: $0 [--action create|what-if] [--bicep-only]"
@@ -45,7 +48,7 @@ if [[ "$BICEP_ONLY" == "1" && "$ACTION" == "what-if" ]]; then
   exit 1
 fi
 
-init_command_log "deploy-shared"
+init_command_log "provision-shared"
 
 # Subscription-deployment names must be unique per `az deployment sub create`
 # run (same reason as the env deployment in common.sh): re-using a name
@@ -112,7 +115,7 @@ fi
 # slow run. Poll the deployment provisioningState until it reads Succeeded.
 step "Waiting for shared deployment $SHARED_DEPLOYMENT_NAME to succeed..."
 attempt=1
-max_attempts=15 # 15 x 60s: ACR + RG propagation can take minutes
+max_attempts=60 # 60 x 15s: ACR + RG propagation can take minutes
 while true; do
   SHARED_STATE=$(run_hide_stderr az deployment sub show --name "$SHARED_DEPLOYMENT_NAME" \
     --query properties.provisioningState -o tsv || true)
@@ -131,7 +134,7 @@ while true; do
     exit 1
   fi
   warn "Attempt $attempt/$max_attempts: state is ${SHARED_STATE:-unknown}, retrying in 60s..."
-  sleep 60
+  sleep 15
   attempt=$((attempt + 1))
 done
 

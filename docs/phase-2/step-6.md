@@ -1,7 +1,7 @@
 # Phase 2 · Step 6 — Deploy + hygiene
 
 **Deploy + hygiene.** `az bicep build --file infra/main.bicep`,
-`./scripts/deploy.sh` (extends Bicep composition only — do not add a
+`./scripts/provision-env.sh` (extends Bicep composition only — do not add a
 container revision path here), verify per this step's checks below,
 `scripts/teardown.sh` still destroys everything. `.env` stays ignored; seed
 reads secrets from env, never hardcodes.

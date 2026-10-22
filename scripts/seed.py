@@ -276,7 +276,7 @@ def seed_documents(conn: psycopg.Connection, memory: dict) -> None:
 # --- Cosmos -----------------------------------------------------------------
 
 # Partition keys, mirrored from infra/modules/cosmos.bicep (Step 1). Only used on
-# the create path, which normally does not run: deploy.sh creates all nine.
+# the create path, which normally does not run: provision-env.sh creates all nine.
 # Kept here so the seed still works against a fresh account, and asserted against
 # cosmos.bicep by the drift test so the two cannot diverge.
 CONTAINER_PARTITION_KEYS = {

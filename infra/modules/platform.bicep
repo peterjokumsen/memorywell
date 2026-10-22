@@ -9,6 +9,10 @@ param identityPrincipalId string
 @secure()
 param postgresAdministrationPassword string
 
+var containerOnly = inputs.global.mode == 'container-apps'
+var databaseOnly = inputs.global.mode == 'databases'
+var nullDefault = 'not-provisioned'
+
 module monitoring 'monitor.bicep' = {
   name: '${deployment().name}-monitoring'
   params: {
@@ -16,7 +20,7 @@ module monitoring 'monitor.bicep' = {
   }
 }
 
-module keyVault 'vault.bicep' = {
+module keyVault 'vault.bicep' = if (!containerOnly) {
   name: '${deployment().name}-keyvault'
   params: {
     inputs: inputs
@@ -24,7 +28,7 @@ module keyVault 'vault.bicep' = {
   }
 }
 
-module cosmos 'cosmos.bicep' = {
+module cosmos 'cosmos.bicep' = if (!containerOnly) {
   name: '${deployment().name}-cosmos'
   params: {
     inputs: inputs
@@ -32,7 +36,7 @@ module cosmos 'cosmos.bicep' = {
   }
 }
 
-module redis 'redis.bicep' = {
+module redis 'redis.bicep' = if (!containerOnly) {
   name: '${deployment().name}-redis'
   params: {
     inputs: inputs
@@ -40,16 +44,16 @@ module redis 'redis.bicep' = {
 }
 
 var redisConnKey = inputs.global.keys.redis
-module redisConnectionString 'secret.bicep' = {
+module redisConnectionString 'secret.bicep' = if (!containerOnly) {
   name: '${deployment().name}-redis-conn'
   params: {
     inputs: inputs
     secretName: redisConnKey
-    secretValue: redis.outputs.connectionUrl
+    secretValue: redis!.outputs!.connectionUrl
   }
 }
 
-module postgres 'postgres.bicep' = {
+module postgres 'postgres.bicep' = if (!containerOnly) {
   name: '${deployment().name}-postgres'
   params: {
     inputs: inputs
@@ -59,18 +63,18 @@ module postgres 'postgres.bicep' = {
 }
 
 var postgresConnKey = inputs.global.keys.postgres
-module postgresConnectionString 'secret.bicep' = {
+module postgresConnectionString 'secret.bicep' = if (!containerOnly) {
   name: '${deployment().name}-postgres-conn'
   params: {
     inputs: inputs
     secretName: postgresConnKey
-    secretValue: postgres.outputs.connectionString
+    secretValue: postgres!.outputs!.connectionString
   }
 }
 
-output postgresServerName string = postgres.outputs.serverName
+output postgresServerName string = postgres.?outputs.serverName ?? ''
 
-module containerApp 'containerapp.bicep' = {
+module containerApp 'containerapp.bicep' = if (!databaseOnly) {
   name: '${deployment().name}-containerapp'
   params: {
     inputs: inputs
@@ -80,15 +84,15 @@ module containerApp 'containerapp.bicep' = {
     monitorWorkspaceId: monitoring.outputs.workspaceId
     monitorApiVersion: monitoring.outputs.apiVersion
     env: {
-      cosmosDatabase: cosmos.outputs.databaseName
-      cosmosEndpoint: cosmos.outputs.accountEndpoint
-      keyVaultUri: keyVault.outputs.keyVaultUri
-      postgresConnKey: postgresConnectionString.outputs.keyName
-      redisConnKey: redisConnectionString.outputs.keyName
+      cosmosDatabase: cosmos.?outputs.databaseName ?? nullDefault
+      cosmosEndpoint: cosmos.?outputs.accountEndpoint ?? nullDefault
+      keyVaultUri: keyVault.?outputs.keyVaultUri ?? nullDefault
+      postgresConnKey: postgresConnectionString.?outputs.keyName ?? nullDefault
+      redisConnKey: redisConnectionString.?outputs.keyName ?? nullDefault
     }
   }
 }
 
-output appName string = containerApp.outputs.appName
-output fqdn string = containerApp.outputs.fqdn
-output redisHostName string = redis.outputs.hostName
+output appName string = containerApp.?outputs.appName ?? nullDefault
+output fqdn string = containerApp.?outputs.fqdn ?? nullDefault
+output redisHostName string = redis.?outputs.hostName ?? nullDefault

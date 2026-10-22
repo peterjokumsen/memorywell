@@ -3,7 +3,7 @@
 `scripts/teardown.sh` is meant to run between study sessions. This workflow runs
 it for you: **nightly at 02:00 UTC** it deletes the environment resource group
 (`rg-<base>-<env>`, e.g. `rg-memwell-dev`) and purges the soft-deleted Key Vault
-so the next `deploy.sh` can recreate it under the same name.
+so the next `provision-env.sh` can recreate it under the same name.
 
 The shared resource group (`rg-<base>-shared`, holding the ACR) is **kept** by
 default — see [Shared RG lock](#shared-rg-lock).
@@ -175,7 +175,7 @@ Since ACR has a cost, for now keeping this at `false` as environment variable.
 When shared RG is needed for environments other than `dev`, should switch this to `true`.
 
 Note that `az login`/RBAC aside, the ACR deletion is what makes the next deploy
-slow — recreate it with `./scripts/deploy-shared.sh`.
+slow — recreate it with `./scripts/provision-shared.sh`.
 
 ---
 
@@ -203,14 +203,14 @@ slow — recreate it with `./scripts/deploy-shared.sh`.
    deploy needs the name free.
 5. Confirm in the portal that `rg-memwell-dev` is gone and
    `rg-memwell-shared` still exists.
-6. Confirm the next `./scripts/deploy.sh` succeeds — that is the real proof the
+6. Confirm the next `./scripts/provision-env.sh` succeeds — that is the real proof the
    vault was purged (an un-purged vault blocks the same name).
 
 ## 4. Pausing / operating
 
 - **Pause the nightlies:** GitHub → repo → Actions → `scheduled-teardown` →
   **Disable workflow**. Re-enable before your next study session.
-- **Rebuild:** `./scripts/deploy.sh` (plus `./scripts/deploy-shared.sh` if the
+- **Rebuild:** `./scripts/provision-env.sh` (plus `./scripts/provision-shared.sh` if the
   shared RG is gone).
 - **Long inactivity:** GitHub disables scheduled workflows on repos with no
   activity for 60 days, so the nightly simply stops running. Check the Actions

@@ -171,7 +171,7 @@ run_deployment() {
     error "The deployment name is the second argument: $deployment_name"
     return 64 # EX_USAGE, matching check-state.sh's convention
   fi
-  local poll_seconds="${DEPLOY_POLL_SECONDS:-60}"
+  local poll_seconds="${DEPLOY_POLL_SECONDS:-15}"
   local out_file err_file pid rc=0 elapsed=0 state="" is_what_if=0 arg
   for arg in "$@"; do
     if [[ "$arg" == "what-if" ]]; then
@@ -218,9 +218,11 @@ run_deployment() {
     # resource states. --rg exits 0/1/2 on absent/not-Succeeded/all-Succeeded,
     # which are all expected mid-deployment, so it is never allowed to fail the
     # deploy — `wait` below is what decides the exit status.
-    group "Resource group $rg_name"
-    run "$_SCRIPTS_DIR/check-state.sh" --rg "$rg_name" || true
-    endgroup
+    if (( $elapsed % 60 == 0 )); then
+      group "Resource group $rg_name"
+      run "$_SCRIPTS_DIR/check-state.sh" --rg "$rg_name" || true
+      endgroup
+    fi
   done
   wait "$pid" || rc=$?
   trap - INT TERM

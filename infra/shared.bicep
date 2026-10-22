@@ -1,5 +1,5 @@
 // Shared resources (ACR, future App Config) living in rg-<base>-shared.
-// Deployed once via scripts/deploy-shared.sh; env deployments reference
+// Deployed once via scripts/provision-shared.sh; env deployments reference
 // the resources here as `existing` instead of owning them.
 targetScope = 'subscription'
 
