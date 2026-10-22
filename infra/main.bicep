@@ -52,7 +52,7 @@ var inputs = {
   tags: tags
 }
 
-// The environment resource group is created by scripts/deploy.sh, not here: an
+// The environment resource group is created by scripts/provision-env.sh, not here: an
 // RG-scoped Key Vault Secrets Officer grant has to exist before this deployment
 // can write connection strings into the vault, so the script creates the group
 // and grants on it first. An RG-scoped grant survives teardown.sh --purge-vault,
@@ -63,7 +63,7 @@ var inputs = {
 // exists because Microsoft.Resources/tags needs a resource group scope to target
 // the group, and this file's targetScope is the subscription (BCP139).
 //
-// Consequence: the group must already exist, so scripts/deploy.sh is the only
+// Consequence: the group must already exist, so scripts/provision-env.sh is the only
 // supported entry point for an environment deployment. A Bicep-only run against
 // a missing group fails rather than creating it.
 resource rg 'Microsoft.Resources/resourceGroups@2025-04-01' existing = {

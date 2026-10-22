@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # One-time (per subscription) shared-resource deployment: the resource group
 # holding resources every environment shares, starting with the ACR.
-# Run before the first `deploy.sh`; `deploy.sh` fails fast if this is missing.
+# Run before the first `provision-env.sh`; `provision-env.sh` fails fast if this is missing.
 set -euo pipefail
 
 # prepare environment variables

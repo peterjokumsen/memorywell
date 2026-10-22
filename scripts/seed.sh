@@ -41,7 +41,7 @@ init_command_log "seed"
 
 # DefaultAzureCredential picks its subscription from the active `az` context, so
 # the seed could otherwise write to whichever subscription the CLI happens to
-# have selected. Same first line deploy.sh uses.
+# have selected. Same first line provision-env.sh uses.
 step "Setting subscription..."
 run az account set --subscription "$SUBSCRIPTION_ID"
 

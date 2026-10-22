@@ -14,6 +14,6 @@ Resources, cheapest SKUs:
 
 ## Verify
 
-- [x] `az deployment sub create` via `scripts/deploy.sh` succeeds (Bicep
+- [x] `az deployment sub create` via `scripts/provision-env.sh` succeeds (Bicep
       compiles clean: `az bicep build --file infra/main.bicep`); portal shows
       RG with Log Analytics, Key Vault, ACR, Container Apps env + app.

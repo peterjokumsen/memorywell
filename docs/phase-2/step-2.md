@@ -31,7 +31,7 @@ step 5's seed owns schema creation.
 - Param threading: `@secure()` `postgresAdministratorPassword` +
   `postgresClientIp` declared on `main.bicep`, forwarded through
   `platform.bicep` into the module; both sourced in `main.bicepparam` via
-  `readEnvironmentVariable` (so no `deploy.sh` change was needed);
+  `readEnvironmentVariable` (so no `provision-env.sh` change was needed);
   `POSTGRES_ADMIN_PASSWORD` added to `.env`/`.env.example`.
 - Dims decision closed at `1536` on both sides (Cosmos `memories.embedding`
   vector index, `documents.embedding vector(1536)`), recorded in
@@ -71,13 +71,13 @@ so these fail at ARM time rather than build time:
 
 ### Verify
 
-- [x] `./scripts/deploy.sh what-if` shows the Flexible Server, database,
+- [x] `./scripts/provision-env.sh what-if` shows the Flexible Server, database,
       `azure.extensions` and firewall rule. Live state matches the template:
       both child resources report **no change**, and the server-level diffs
       are ARM echoing defaults back (`authConfig.activeDirectoryAuth
 "Disabled"`, `dataEncryption.type "SystemManaged"`,
       `storage.iops 120` / `tier P4` / `type Premium_LRS`) — no-ops.
-- [x] `./scripts/deploy.sh create` succeeds.
+- [x] `./scripts/provision-env.sh create` succeeds.
 - [x] `az postgres flexible-server show -g rg-memwell-dev -n pg-memwell-dev`
       → `Standard_B1ms` / `Burstable`, `highAvailability.mode "Disabled"`,
       `state: Ready`, `publicNetworkAccess "Enabled"`, `version 16` (minor 15),

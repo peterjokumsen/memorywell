@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Full deployment: shared resources first, then the environment.
-# Passes the action through to both steps (e.g. `./deploy-all.sh --action what-if`).
+# Passes the action through to both steps (e.g. `./provision-all.sh --action what-if`).
 # Fails fast: the environment step never runs if the shared step fails.
 set -euo pipefail
 
@@ -48,27 +48,27 @@ fi
 
 init_command_log "provision-all"
 
-step "Deploying shared resources..."
+step "Provisioning shared resources..."
 shared_args=("--action" "$ACTION")
 if [[ "$BICEP_ONLY" == "1" ]]; then
   shared_args+=("--bicep-only")
 fi
-if ! run "$SCRIPT_DIR/deploy-shared.sh" "${shared_args[@]}"; then
+if ! run "$SCRIPT_DIR/provision-shared.sh" "${shared_args[@]}"; then
   error "Shared deployment failed; aborting before environment deployment."
   exit 1
 fi
 
-step "Deploying environment resources..."
+if [[ "$BICEP_ONLY" == "0" ]]; then
+  step "Deploying container images and updating Container Apps..."
+  container_args=("--action" "$ACTION" "--update-apps")
+  run "$SCRIPT_DIR/publish-containers.sh" "${container_args[@]}"
+fi
+
+step "Provisioning environment resources..."
 env_args=("--action" "$ACTION")
 if [[ "$BICEP_ONLY" == "1" ]]; then
   env_args+=("--bicep-only")
 fi
-run "$SCRIPT_DIR/deploy.sh" "${env_args[@]}"
-
-if [[ "$BICEP_ONLY" == "0" ]]; then
-  step "Deploying container images and updating Container Apps..."
-  container_args=("--action" "$ACTION" "--update-apps")
-  run "$SCRIPT_DIR/deploy-containers.sh" "${container_args[@]}"
-fi
+run "$SCRIPT_DIR/povision-env.sh" "${env_args[@]}"
 
 success "All deployments completed successfully."

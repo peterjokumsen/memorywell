@@ -64,7 +64,7 @@ step "Checking shared resource group $SHARED_RG_NAME..."
 if ! SHARED_RG_STATE=$(run_hide_stderr az group show --name "$SHARED_RG_NAME" --query properties.provisioningState -o tsv); then
   if [[ "$ACTION" == "create" ]]; then
     info "Shared resource group $SHARED_RG_NAME not found; deploying it first..."
-    run "$SCRIPT_DIR/deploy-shared.sh" create
+    run "$SCRIPT_DIR/provision-shared.sh" create
   else
     error "Shared resource group $SHARED_RG_NAME not found; the shared ACR does not exist."
     error "Deploy it first (what-if never creates shared resources):"
@@ -81,7 +81,7 @@ step "Checking shared ACR $(registry_name) exists..."
 if ! run_quiet az acr show -n "$(registry_name)"; then
   if [[ "$ACTION" == "create" ]]; then
     info "Shared ACR $(registry_name) not found in $SHARED_RG_NAME; redeploying it first..."
-    run "$SCRIPT_DIR/deploy-shared.sh" create
+    run "$SCRIPT_DIR/provision-shared.sh" create
   else
     error "Shared ACR $(registry_name) not found in $SHARED_RG_NAME."
     error "Redeploy it with:"

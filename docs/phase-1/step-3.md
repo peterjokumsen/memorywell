@@ -9,4 +9,4 @@ do not build all 11 PLAN modules now.
 
 - [x] Whatever split you chose still compiles clean
       (`az bicep build --file infra/main.bicep`) and deploys via
-      `scripts/deploy.sh` (step 5).
+      `scripts/provision-env.sh` (step 5).
