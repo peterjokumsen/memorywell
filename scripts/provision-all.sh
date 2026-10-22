@@ -11,6 +11,7 @@ source "$SCRIPT_DIR/common.sh"
 # Parse arguments
 ACTION="create"
 BICEP_ONLY=0
+DEPLOYMENT_MODE="all"
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --action)
@@ -21,10 +22,24 @@ while [[ $# -gt 0 ]]; do
       BICEP_ONLY=1
       shift
       ;;
+    --deployment-mode)
+      DEPLOYMENT_MODE="${2:-}"
+      case "$DEPLOYMENT_MODE" in
+        "all" | "container-apps" | "databases")
+          shift 2
+          ;;
+        *)
+          error "Unknown --deployment-mode: $1"
+          echo "Expected: [all|container-apps|databases]"
+          exit 1
+          ;;
+      esac
+      ;;
     -h|--help)
-      echo "Usage: $0 [--action create|what-if] [--bicep-only]"
+      echo "Usage: $0 [--action create|what-if] [--bicep-only] [--deployment-mode all|container-apps|databases]"
       echo "  --action ACTION      Deployment action: create (default) or what-if"
       echo "  --bicep-only         Stop after Bicep deployments; skip post-deployment steps"
+      echo "  --deployment-mode    Select mode of deployment for environment resource group"
       exit 0
       ;;
     *)
@@ -59,16 +74,16 @@ if ! run "$SCRIPT_DIR/provision-shared.sh" "${shared_args[@]}"; then
 fi
 
 if [[ "$BICEP_ONLY" == "0" ]]; then
-  step "Deploying container images and updating Container Apps..."
-  container_args=("--action" "$ACTION" "--update-apps")
+  step "Publishing containers..."
+  container_args=("--action" "$ACTION")
   run "$SCRIPT_DIR/publish-containers.sh" "${container_args[@]}"
 fi
 
 step "Provisioning environment resources..."
-env_args=("--action" "$ACTION")
+env_args=("--action" "$ACTION" "--deployment-mode" "$DEPLOYMENT_MODE")
 if [[ "$BICEP_ONLY" == "1" ]]; then
   env_args+=("--bicep-only")
 fi
-run "$SCRIPT_DIR/povision-env.sh" "${env_args[@]}"
+run "$SCRIPT_DIR/provision-env.sh" "${env_args[@]}"
 
 success "All deployments completed successfully."
