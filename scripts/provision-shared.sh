@@ -45,7 +45,7 @@ if [[ "$BICEP_ONLY" == "1" && "$ACTION" == "what-if" ]]; then
   exit 1
 fi
 
-init_command_log "deploy-shared"
+init_command_log "provision-shared"
 
 # Subscription-deployment names must be unique per `az deployment sub create`
 # run (same reason as the env deployment in common.sh): re-using a name

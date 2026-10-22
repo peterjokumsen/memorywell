@@ -20,7 +20,7 @@ while [[ $# -gt 0 ]]; do
     -h|--help)
       echo "Usage: $0 [--action create|what-if] [--bicep-only]"
       echo "  --action ACTION      Deployment action: create (default) or what-if"
-      echo "  --bicep-only         Stop after Bicep deployment; skip Docker build, container app update, and health checks"
+      echo "  --bicep-only         Stop after Bicep deployment; skip container image build/push and app update"
       exit 0
       ;;
     *)
@@ -42,7 +42,7 @@ if [[ "$BICEP_ONLY" == "1" && "$ACTION" == "what-if" ]]; then
   exit 1
 fi
 
-init_command_log "deploy"
+init_command_log "provision-env"
 
 # Get client IP and mint the timestamped deployment name + image tag
 # (lazy: sourcing common.sh alone reserves nothing; see deployment_name in common.sh).
@@ -68,7 +68,7 @@ if ! SHARED_RG_STATE=$(run_hide_stderr az group show --name "$SHARED_RG_NAME" --
   else
     error "Shared resource group $SHARED_RG_NAME not found; the shared ACR does not exist."
     error "Deploy it first (what-if never creates shared resources):"
-    error "  ./scripts/deploy-shared.sh create"
+    error "  ./scripts/provision-shared.sh create"
     exit 1
   fi
 elif [[ "$SHARED_RG_STATE" == "Deleting" ]]; then
@@ -85,7 +85,7 @@ if ! run_quiet az acr show -n "$(registry_name)"; then
   else
     error "Shared ACR $(registry_name) not found in $SHARED_RG_NAME."
     error "Redeploy it with:"
-    error "  ./scripts/deploy-shared.sh create"
+    error "  ./scripts/provision-shared.sh create"
     exit 1
   fi
 fi
@@ -211,9 +211,7 @@ fi
 if [[ "$BICEP_ONLY" == "1" ]]; then
   success "Bicep deployment completed. Stopping due to --bicep-only flag."
   success "Run the following manually to complete the deployment:"
-  success "  1. Build and push Docker image: az acr build -r \$(registry_name) -t api:\$ENVIRONMENT -t api:\$IMAGE_TAG \$ROOT/api"
-  success "  2. Update container app: az containerapp update --name <app-name> --resource-group $RG_NAME --image \$(login_server)/api:\$IMAGE_TAG"
-  success "  3. Verify health: curl https://<fqdn>/health"
+  success "  ./scripts/publish-containers.sh --update-apps"
   exit 0
 fi
 
@@ -338,28 +336,6 @@ if [[ "$(login_server)" != "$LOGIN_SERVER" ]]; then
   exit 1
 fi
 
-step "Building and pushing Docker image to ACR..."
-# Push both the floating env tag (keeps the Bicep pre-check working and marks
-# latest-stable) and the unique timestamp tag (guarantees a template-string
-# change so `containerapp update` mints a new revision every run).
-run az acr build -r "$REGISTRY" -t api:"$ENVIRONMENT" -t api:"$IMAGE_TAG" "$ROOT/api"
-
-step "Deploying container app..."
-run az containerapp update \
-  --name "$APP_NAME" \
-  --resource-group "$RG_NAME" \
-  --image "$LOGIN_SERVER/api:$IMAGE_TAG"
-
-step "Waiting for https://${FQDN}/health ..."
-attempt=1
-max_attempts=12 # ~60s: covers ACR pull + scale-from-zero on Consumption
-until run curl -sSf --max-time 5 "https://${FQDN}/health" | jq; do
-  if [[ "$attempt" -ge "$max_attempts" ]]; then
-    error "Health check failed after $max_attempts attempts."
-    exit 1
-  fi
-  warn "Attempt $attempt/$max_attempts failed, retrying in 5s..."
-  sleep 5
-  attempt=$((attempt + 1))
-done
-success "API is healthy at https://${FQDN}/health."
+success "Bicep deployment completed successfully."
+success "Run the following to build/push container images and update Container Apps:"
+success "  ./scripts/publish-containers.sh --update-apps"

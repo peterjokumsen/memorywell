@@ -46,7 +46,7 @@ if [[ "$BICEP_ONLY" == "1" && "$ACTION" == "what-if" ]]; then
   exit 1
 fi
 
-init_command_log "deploy-all"
+init_command_log "provision-all"
 
 step "Deploying shared resources..."
 shared_args=("--action" "$ACTION")
@@ -64,5 +64,11 @@ if [[ "$BICEP_ONLY" == "1" ]]; then
   env_args+=("--bicep-only")
 fi
 run "$SCRIPT_DIR/deploy.sh" "${env_args[@]}"
+
+if [[ "$BICEP_ONLY" == "0" ]]; then
+  step "Deploying container images and updating Container Apps..."
+  container_args=("--action" "$ACTION" "--update-apps")
+  run "$SCRIPT_DIR/deploy-containers.sh" "${container_args[@]}"
+fi
 
 success "All deployments completed successfully."
