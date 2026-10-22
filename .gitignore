@@ -149,6 +149,8 @@ activemq-data/
 
 # Environments
 .env
+# Timestamped backups created by scripts/generate-env.sh (contain secrets)
+.env.bak.*
 .envrc
 .venv
 env/
@@ -156,6 +158,9 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+
+# Azure Functions local settings (created from functions/local.settings.json.template)
+local.settings.json
 
 # Spyder project settings
 .spyderproject

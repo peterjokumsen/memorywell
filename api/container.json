@@ -1,0 +1,6 @@
+{
+  "image": "api",
+  "appRole": "",
+  "healthPath": "/health",
+  "brunoVar": "api_url"
+}

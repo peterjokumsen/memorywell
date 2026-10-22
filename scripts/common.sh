@@ -48,6 +48,10 @@ SHARED_ACR_NAME="$(echo "acr${BASE_NAME}" | tr '[:upper:]' '[:lower:]' | tr -d '
 # soft-deleted vault keeps the old name reserved until it is purged.
 VAULT_NAME="kv-${BASE_NAME}-${ENVIRONMENT}"
 COSMOS_ACCOUNT_NAME="cosmos-${BASE_NAME}-${ENVIRONMENT}"
+# Consumption-plan Function App name. It must match infra/modules/functions.bicep,
+# and it owns a globally unique <name>.azurewebsites.net hostname, so scripts read
+# the FQDN back from Azure instead of rebuilding the URL.
+FUNCTION_APP_NAME="func-${BASE_NAME}-${ENVIRONMENT}"
 # Cosmos endpoint is a pure function of the account name, so derive it rather
 # than querying `az cosmosdb show`: sourcing common.sh must stay free of Azure
 # round-trips (same reasoning as registry_name/login_server below, and unlike
@@ -59,7 +63,7 @@ COSMOS_ENDPOINT="https://${COSMOS_ACCOUNT_NAME}.documents.azure.com:443/"
 # COSMOS_ACCOUNT_NAME do.
 COSMOS_DATABASE="memorywell"
 
-export COSMOS_ACCOUNT_NAME COSMOS_DATABASE COSMOS_ENDPOINT SHARED_ACR_NAME SHARED_RG_NAME VAULT_NAME
+export COSMOS_ACCOUNT_NAME COSMOS_DATABASE COSMOS_ENDPOINT SHARED_ACR_NAME SHARED_RG_NAME VAULT_NAME FUNCTION_APP_NAME
 
 # Keys used for secrets
 POSTGRES_CONNECTION_STRING_KEY="postgres-connection-string"

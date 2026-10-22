@@ -38,7 +38,7 @@ flowchart LR
         httpf["http_invite_claim<br/>magic-link claim"]
     end
 
-    subgraph eg["Event Grid — custom topic"]
+    subgraph eg["Event Grid — domain"]
         egrid["domain events<br/>filters · retries · routing"]
     end
 
@@ -143,14 +143,24 @@ is the only coordination path (AGENTS.md domain invariant).
 
 ---
 
-## Event Grid — custom topic `evg-<base>-<env>` — **planned** (Phase 3 · step 2)
+## Event Grid — domain `evg-<base>-<env>` — **built** (Phase 3 · step 2)
 
-Source: `docs/phase-3/step-2.md`. Custom topic for app domain events, subscriptions
-with `includedEventTypes` / `subjectBeginsWith` filters, retry policy, dead-letter
-to a storage container for failed deliveries.
+Source: `docs/phase-3/step-2.md`. An Event Grid **domain** for app domain events,
+with six domain-scope subscriptions using `includedEventTypes` /
+`subjectBeginsWith` filters, retry policy, and dead-letter to a storage container
+for failed deliveries.
+
+**Why a domain** (recorded decision): the namespace shape — one publishing
+endpoint for many related topics, per-topic RBAC/partitioning available later,
+and room to experiment without adding another top-level resource. Today it
+behaves like a single topic. Emitters publish to the domain endpoint and name the
+target topic in the event's `topic` field (e.g. `"topic": "memory.recorded"`); on
+a custom topic that field is the topic's resource ID instead. Domain topics are
+auto-managed when subscribing at domain-topic scope
+(`autoCreateTopicWithFirstSubscription`); no `domains/topics` resources exist yet.
 
 **Routing model (working assumption — confirm at the Phase 3 review gate):**
-emitters publish domain events to the Event Grid topic; each event subscription
+emitters publish domain events to the Event Grid domain; each event subscription
 routes with filters either (a) directly to a Function endpoint (webhook-style) or
 (b) bridged into a Service Bus topic (e.g. `memory-recorded-to-sb`) for durable
 fan-out + DLQ before Function consumption. Event Grid = filtering/retries/routing;

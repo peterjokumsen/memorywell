@@ -1,12 +1,18 @@
+"""Event Grid event logger.
+
+Registered as a blueprint in ``function_app.py``: without that registration the
+route never reaches the host's route table and every call 404s.
+"""
+
 import json
 import logging
 
 import azure.functions as func
 
-app = func.FunctionApp(http_auth_level=func.AuthLevel.FUNCTION)
+bp = func.Blueprint()
 
 
-@app.route(route="log", methods=["POST"])
+@bp.route(route="log", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
 def event_logger(req: func.HttpRequest) -> func.HttpResponse:
     """
     Generic Event Grid event logger.

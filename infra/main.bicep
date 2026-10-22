@@ -18,6 +18,10 @@ param cosmosAccountName string
 param cosmosDatabase string
 param cosmosPrincipalObjectId string
 param redisKeyName string
+// Event Grid webhook subscriptions are only valid once the Function App they
+// point at is answering its validation handshake. provision-env.sh deploys
+// twice on a full run: infrastructure with this false, then code, then true.
+param deployEventSubscriptions bool = true
 
 @secure()
 param postgresAdministratorPassword string
@@ -120,6 +124,7 @@ module platform './modules/platform.bicep' = {
     acrLoginServer: acr.properties.loginServer
     identityId: identity.outputs.id
     identityPrincipalId: identity.outputs.principalId
+    deployEventSubscriptions: deployEventSubscriptions
     postgresAdministrationPassword: postgresAdministratorPassword
   }
   // No output links platform to acrPull, so order it explicitly: the app must
@@ -133,3 +138,6 @@ output registryName string = acr.name
 output loginServer string = acr.properties.loginServer
 output appName string = platform.outputs.appName
 output fqdn string = platform.outputs.fqdn
+output functionAppName string = platform.outputs.functionAppName
+output functionAppFqdn string = platform.outputs.functionAppFqdn
+output functionLogUrl string = platform.outputs.functionLogUrl

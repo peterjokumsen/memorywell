@@ -85,9 +85,11 @@ on Azure) stack, which remains the core learning goal.
     `memory.flagged`
   - **Dead-letter queue** handling with a monitoring/resubmit path (includes failed
     classifications/extractions)
-- **Azure Event Grid**: custom events (`checkin.due`, `voice.received`,
-  `memory.archived`, `memory.recorded`, `memory.flagged`, `alias.requested`,
-  `alias.updated`) with **filters**, retry policies, routing to Functions
+- **Azure Event Grid**: an Event Grid **domain** (`evg-<base>-<env>`) carrying
+  the custom events (`checkin.due`, `voice.received`, `memory.archived`,
+  `memory.recorded`, `memory.flagged`, `alias.requested`, `alias.updated`) with
+  **filters**, retry policies, routing to Functions. Domain-scope subscriptions
+  today; per-topic domain topics stay available for per-tenant partitioning.
 - **Azure Functions**: **triggers and bindings** throughout
   - Timer trigger: daily cadence sweep per (chronicle, contributor) — weekly if 7d
     elapsed, monthly if 30d elapsed, special-occasions only on calendar/milestone
@@ -175,12 +177,15 @@ memorywell/
                 servicebus, eventgrid, functions, keyvault, appconfig, monitor
   api/          FastAPI container: prompter.py, curator.py, guardian.py, shared
                 rag.py, conversations, persona, voice/photo upload
+                (container.json: image/app/health/bruno metadata for publishing)
   functions/    Python Functions (timer check-ins/nudges, SB transcription worker,
                 SB guardian reviewer, change feed embeddings, HTTP invite claim, DLQ)
+                (consumption plan; code ships with scripts/publish-functions.sh)
   web/          Frontend (Vite + React: Drop Zone, timeline, owner review queue)
 docs/         architecture.md, EVENTS.md (event catalog: emitter/consumer/purpose),
                 AI-200 skills-to-components matrix, KQL queries
-  scripts/      provision-env.sh, provision-all.sh, provision-shared.sh, publish-containers.sh, teardown.sh, seed
+  scripts/      generate-env.sh, provision-env.sh, provision-all.sh, provision-shared.sh, publish-containers.sh, publish-functions.sh, teardown.sh, seed
+                (generate-env.sh fills .env from .env.example; publish-containers.sh builds every top-level dir carrying container.json; publish-functions.sh zips functions/ with Core Tools)
 ```
 
 ---

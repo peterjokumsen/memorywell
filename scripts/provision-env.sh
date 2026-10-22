@@ -209,10 +209,19 @@ log_vars \
   "Deployment=$DEPLOYMENT_NAME" \
   "ImageTag=$IMAGE_TAG"
 
-# Build and push function logger image to ACR BEFORE Bicep deployment
-# (platform.bicep's functionLogger Container App pulls it immediately)
-step "Building and pushing function logger image to ACR..."
-run az acr build -r "$(registry_name)" -t memorywell-functions:latest "$ROOT/functions"
+# Event Grid validates a webhook endpoint when the subscription is created: it
+# POSTs a SubscriptionValidationEvent and expects the code echoed back. A
+# Function App created in the same deployment has no code published yet, so
+# /api/log 404s and the handshake fails the whole deployment. Every create run
+# therefore holds subscriptions back; a full run then publishes functions/ and
+# re-runs the template to create them. Incremental deployments leave existing
+# subscriptions alone on the first pass, so nothing is torn down in between.
+if [[ "$ACTION" == "create" ]]; then
+  SUBSCRIPTIONS_PARAM="deployEventSubscriptions=false"
+  info "Event Grid subscriptions are held back until the Function App has code (second pass)."
+else
+  SUBSCRIPTIONS_PARAM="deployEventSubscriptions=true"
+fi
 
 # run_deployment, not `run`: this call is silent for minutes at a time (ARM
 # returns nothing until the deployment finishes), so it reports what it is
@@ -221,7 +230,8 @@ run_deployment "$RG_NAME" "$DEPLOYMENT_NAME" "$ACTION" \
   --location "$LOCATION" \
   --name "$DEPLOYMENT_NAME" \
   --template-file "$ROOT/infra/main.bicep" \
-  --parameters "$ROOT/infra/main.bicepparam"
+  --parameters "$ROOT/infra/main.bicepparam" \
+  --parameters "$SUBSCRIPTIONS_PARAM"
 
 if [[ "$ACTION" == "what-if" ]]; then
   success "What-if analysis completed. No changes were made."
@@ -229,9 +239,11 @@ if [[ "$ACTION" == "what-if" ]]; then
 fi
 
 if [[ "$BICEP_ONLY" == "1" || "$DEPLOYMENT_MODE" == "container-apps" ]]; then
-  success "Bicep deployment completed. Stopping due to --bicep-only flag."
+  success "Bicep deployment completed. Stopping before image/code publish."
+  success "Event Grid subscriptions stay held back until a full run enables them."
   success "Run the following manually to complete the deployment:"
   success "  ./scripts/publish-containers.sh --update-apps"
+  success "Re-run without --bicep-only to publish functions/ and enable subscriptions."
   exit 0
 fi
 
@@ -354,6 +366,23 @@ log_vars \
 if [[ "$(login_server)" != "$LOGIN_SERVER" ]]; then
   error "Login server mismatch"
   exit 1
+fi
+
+# Infrastructure and code deploy separately: Bicep creates the Function App,
+# Core Tools ships functions/, then the subscriptions can be created without a
+# failed validation handshake. `databases` mode has no Function App/Event Grid,
+# and `--bicep-only` stopped above, so only the full run gets here.
+if [[ "$DEPLOYMENT_MODE" == "all" ]]; then
+  step "Publishing Function App code..."
+  run "$SCRIPT_DIR/publish-functions.sh"
+
+  step "Enabling Event Grid subscriptions..."
+  run_deployment "$RG_NAME" "$DEPLOYMENT_NAME" create \
+    --location "$LOCATION" \
+    --name "$DEPLOYMENT_NAME" \
+    --template-file "$ROOT/infra/main.bicep" \
+    --parameters "$ROOT/infra/main.bicepparam" \
+    --parameters deployEventSubscriptions=true
 fi
 
 success "Bicep deployment completed successfully."

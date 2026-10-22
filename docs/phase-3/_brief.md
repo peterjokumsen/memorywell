@@ -20,8 +20,8 @@ Deploys, each as its own group (one step per group, no mixing):
 - **Group A — Service Bus**: namespace, queue (transcription jobs), topic +
   subscriptions (`memory.recorded` fan-out: embedding / digest / guardian;
   `alias.requested`, `alias.updated`, `memory.flagged`), dead-letter handling.
-- **Group B — Event Grid**: custom topic (or system topic) for the custom
-  events (`checkin.due`, `voice.received`, `memory.archived`, `memory.recorded`,
+- **Group B — Event Grid**: an Event Grid **domain** for the custom events
+  (`checkin.due`, `voice.received`, `memory.archived`, `memory.recorded`,
   `memory.flagged`, `alias.requested`, `alias.updated`) with filters, retry
   policies, and routing to Functions.
 - **Group C — Functions app scaffold + timer trigger**: daily cadence sweep per
@@ -61,7 +61,7 @@ OpenTelemetry wiring (Phase 7). No pre-building later phases.
 | Step | File                   | Group                                                        |
 | ---- | ---------------------- | ------------------------------------------------------------ |
 | 1    | [step-1.md](step-1.md) | Group A — Service Bus (queue, topic, subs, DLQ)              |
-| 2    | [step-2.md](step-2.md) | Group B — Event Grid (custom topic, filters, retries)        |
+| 2    | [step-2.md](step-2.md) | Group B — Event Grid (domain, filters, retries)              |
 | 3    | [step-3.md](step-3.md) | Group C — Functions scaffold + timer trigger (cadence sweep) |
 | 4    | [step-4.md](step-4.md) | Group D — Service Bus triggers (transcription, guardian)     |
 | 5    | [step-5.md](step-5.md) | Group E — Change feed (embeddings) + HTTP invite claim       |
@@ -74,7 +74,7 @@ until the §6 review gate passes.
 
 ```plaintext
 infra/modules/servicebus.bicep   # Group A: namespace + queue + topic + subs + DLQ
-infra/modules/eventgrid.bicep    # Group B: custom topic + event subscriptions
+infra/modules/eventgrid.bicep    # Group B: domain + event subscriptions
 infra/modules/functions.bicep    # Group C–E: Function App (consumption) + plan + storage
 infra/modules/platform.bicep    # + servicebus/eventgrid/functions composition (edit only)
 infra/modules/vault.bicep       # + Service Bus connection string? (prefer identity)

@@ -29,19 +29,39 @@ skips proactive prompts. **Stub only** — log "cadence sweep tick" and return.
 Real filtering lands in Phase 4a.
 
 ```python
-# functions/timer_cadence/__init__.py — stub
+# functions/timer_cadence/__init__.py — stub (Python v2 model)
 import logging
+
 import azure.functions as func
 
-def main(timer: func.TimerRequest) -> None:
-    logging.info("cadence sweep tick: %s", timer.past_due)
+bp = func.Blueprint()
+
+
+@bp.timer_trigger(schedule="0 0 8 * * *", arg_name="timer", run_on_startup=False)
+def timer_cadence(timer: func.TimerRequest) -> None:
+    logging.info("cadence sweep tick: past_due=%s", timer.past_due)
 ```
+
+Register it in `functions/function_app.py` (`from timer_cadence import bp as
+timer_cadence_bp` + `app.register_blueprint(timer_cadence_bp)`). A `def main`
+without the blueprint is the v1 signature: the host indexes the v2 model from
+`function_app.py` only, so the trigger silently never appears.
 
 ## Infra
 
-`functions.bicep`: storage account (Functions runtime requirement), consumption
-plan (`Y1`/Dynamic), Function App (Python, Linux), app settings pointing at
-Service Bus / Cosmos / Key Vault via managed identity or connection strings.
+`functions.bicep`: reuses the environment storage account for
+`AzureWebJobsStorage` (one LRS account, not two), consumption plan
+(`Y1`/Dynamic), Function App (Python 3.11, Linux), app settings
+`FUNCTIONS_EXTENSION_VERSION=~4` + `FUNCTIONS_WORKER_RUNTIME=python`. Later
+steps add Service Bus / Cosmos settings once their triggers exist.
+
+The logger previously ran as a Container App (`ca-<base>-<env>-logger`).
+Incremental Bicep deployments do not delete resources that left the template,
+so remove that app once the Function App answers:
+
+```bash
+az containerapp delete -n "ca-${BASE_NAME}-${ENVIRONMENT}-logger" -g "$RG_NAME" --yes
+```
 
 ## Verify
 

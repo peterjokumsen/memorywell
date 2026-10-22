@@ -6,27 +6,29 @@ info:
 http:
   method: POST
   url: "{{fns_url}}/api/log"
-  auth: inherit
   headers:
     - name: Content-Type
       value: application/json
   body:
     type: json
-    content: |
-      {
-        "id": "event-123",
-        "topic": "/subscriptions/xxx/resourceGroups/xxx/providers/Microsoft.EventGrid/topics/xxx",
-        "subject": "memorywell/chronicles/abc123",
-        "eventType": "ChronicleCreated",
-        "eventTime": "2026-10-21T12:00:00Z",
-        "data": {
-          "chronicleId": "abc123",
-          "name": "Grandma's Stories",
-          "recipientId": "recipient-001"
-        },
-        "dataVersion": "1.0",
-        "metadataVersion": "1"
-      }
+    data: |-
+      [
+        {
+          "id": "6f2a1f3e-36f7-4e2f-9d5b-1c0f3a5d7e11",
+          "eventType": "memory.recorded",
+          "subject": "/chronicles/chr_demo/memories/mem_0001",
+          "eventTime": "2026-10-22T20:00:00Z",
+          "dataVersion": "1.0",
+          "metadataVersion": "1",
+          "topic": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-memwell-dev/providers/Microsoft.EventGrid/domains/evg-memwell-dev",
+          "data": {
+            "chronicleId": "chr_demo",
+            "memoryId": "mem_0001",
+            "authorId": "usr_owner"
+          }
+        }
+      ]
+  auth: inherit
 
 settings:
   encodeUrl: true

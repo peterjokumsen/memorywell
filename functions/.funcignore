@@ -1,0 +1,17 @@
+# Keep local-only and build-only files out of the zip that Core Tools uploads.
+# `func azure functionapp publish` packs the project directory; without this the
+# local virtualenv, bytecode caches and local.settings.json (which holds a dev
+# storage string) would be part of the deployment package.
+.venv/
+.venv/**
+__pycache__/
+**/__pycache__/
+**/__pycache__/**
+*.py[cod]
+**/*.py[cod]
+local.settings.json
+.funcignore
+.git/
+.vscode/
+.pytest_cache/
+.ruff_cache/

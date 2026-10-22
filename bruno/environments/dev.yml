@@ -1,8 +1,8 @@
 name: dev
 variables:
   - name: api_url
-    value: https://ca-memwell-dev.wonderfulsmoke-6afb970b.westeurope.azurecontainerapps.io
+    value: https://ca-memwell-dev.wonderfulriver-27bc2090.westeurope.azurecontainerapps.io
     description: Deployed API Container App FQDN
   - name: fns_url
-    value: https://ca-memwell-dev-logger.wonderfulsmoke-6afb970b.westeurope.azurecontainerapps.io
-    description: Deployed Functions Container App FQDN
+    value: https://func-memwell-dev.azurewebsites.net
+    description: Deployed Function App base URL (no /api suffix)
