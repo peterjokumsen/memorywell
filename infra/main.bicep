@@ -1,8 +1,9 @@
-import { GlobalInputs, EnvironmentType } from './_types.bicep'
+import { GlobalInputs, EnvironmentType, DeploymentMode } from './_types.bicep'
 
 // scoped to subscription to create resource group.
 targetScope = 'subscription'
 
+param deploymentMode DeploymentMode?
 param location string
 param baseName string
 param environment EnvironmentType
@@ -27,6 +28,7 @@ var globalInputs GlobalInputs = {
   cosmosDatabase: !empty(cosmosDatabase) ? cosmosDatabase : fail('cosmosDatabase is not set')
   keyVaultName: !empty(keyVaultName) ? keyVaultName : fail('keyvaultName is not set')
 
+  mode: deploymentMode ?? 'all'
   location: location
   baseName: baseName
   environment: environment

@@ -1,5 +1,6 @@
 using './main.bicep'
 param baseName = readEnvironmentVariable('BASE_NAME', 'memwell')
+param deploymentMode = readEnvironmentVariable('DEPLOYMENT_MODE', 'all')
 param environment = readEnvironmentVariable('ENVIRONMENT', 'dev')
 param location = readEnvironmentVariable('LOCATION', 'westeurope')
 param resourceGroupName = readEnvironmentVariable('RG_NAME', '')

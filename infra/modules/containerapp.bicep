@@ -29,6 +29,36 @@ resource managedEnvironment 'Microsoft.App/managedEnvironments@2025-07-01' = {
   }
 }
 
+var secrets = inputs.global.mode == 'container-apps'
+  ? []
+  : [
+      {
+        name: env.postgresConnKey
+        keyVaultUrl: '${env.keyVaultUri}secrets/${env.postgresConnKey}'
+        identity: identityId
+      }
+      {
+        name: env.redisConnKey
+        keyVaultUrl: '${env.keyVaultUri}secrets/${env.redisConnKey}'
+        identity: identityId
+      }
+    ]
+
+var environmentVariables = inputs.global.mode == 'container-apps'
+  ? []
+  : [
+      { name: 'COSMOS_ENDPOINT', value: env.cosmosEndpoint }
+      { name: 'COSMOS_DATABASE', value: env.cosmosDatabase }
+      {
+        name: 'POSTGRES_CONNECTION_STRING'
+        secretRef: env.postgresConnKey
+      }
+      {
+        name: 'REDIS_URL'
+        secretRef: env.redisConnKey
+      }
+    ]
+
 resource containerApp 'Microsoft.App/containerApps@2025-07-01' = {
   name: 'ca-${inputs.global.baseName}-${inputs.global.environment}'
   location: inputs.global.location
@@ -57,18 +87,7 @@ resource containerApp 'Microsoft.App/containerApps@2025-07-01' = {
       // (https://<vault>.vault.azure.net/secrets/<name>), not the bare vault
       // URI: Container Apps rejects a vault-level URL outright. vaultUri already
       // ends in '/', so this appends `secrets/<name>` with no separator.
-      secrets: [
-        {
-          name: env.postgresConnKey
-          keyVaultUrl: '${env.keyVaultUri}secrets/${env.postgresConnKey}'
-          identity: identityId
-        }
-        {
-          name: env.redisConnKey
-          keyVaultUrl: '${env.keyVaultUri}secrets/${env.redisConnKey}'
-          identity: identityId
-        }
-      ]
+      secrets: secrets
     }
     template: {
       scale: {
@@ -83,18 +102,7 @@ resource containerApp 'Microsoft.App/containerApps@2025-07-01' = {
             cpu: json('0.25')
             memory: '0.5Gi'
           }
-          env: [
-            { name: 'COSMOS_ENDPOINT', value: env.cosmosEndpoint }
-            { name: 'COSMOS_DATABASE', value: env.cosmosDatabase }
-            {
-              name: 'POSTGRES_CONNECTION_STRING'
-              secretRef: env.postgresConnKey
-            }
-            {
-              name: 'REDIS_URL'
-              secretRef: env.redisConnKey
-            }
-          ]
+          env: environmentVariables
         }
       ]
     }

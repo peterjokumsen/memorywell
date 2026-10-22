@@ -2,6 +2,9 @@
 type EnvironmentType = 'dev' | 'test' | 'prod'
 
 @export()
+type DeploymentMode = 'all' | 'container-apps' | 'databases'
+
+@export()
 type SecretKeys = {
   @description('Key used for Postgres connection string')
   postgres: string
@@ -18,6 +21,8 @@ type GlobalInputs = {
   @description('Name of Key Vault')
   keyVaultName: string
 
+  @description('Mode of deployment, to choose resources deployed')
+  mode: DeploymentMode
   @description('The location of the resources.')
   location: string
   @description('The base name for all resources.')

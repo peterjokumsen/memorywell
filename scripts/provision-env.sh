@@ -7,6 +7,7 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/common.sh"
 # Parse arguments
 ACTION="create"
 BICEP_ONLY=0
+DEPLOYMENT_MODE="all"
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --action)
@@ -17,10 +18,24 @@ while [[ $# -gt 0 ]]; do
       BICEP_ONLY=1
       shift
       ;;
+    --deployment-mode)
+      DEPLOYMENT_MODE="${2:-}"
+      case "$DEPLOYMENT_MODE" in
+        "all" | "container-apps" | "databases")
+          shift 2
+          ;;
+        *)
+          error "Unknown --deployment-mode: $1"
+          echo "Expected: [all|container-apps|databases]"
+          exit 1
+          ;;
+      esac
+      ;;
     -h|--help)
-      echo "Usage: $0 [--action create|what-if] [--bicep-only]"
+      echo "Usage: $0 [--action create|what-if] [--bicep-only] [--deployment-mode all|container-apps|databases]"
       echo "  --action ACTION      Deployment action: create (default) or what-if"
       echo "  --bicep-only         Stop after Bicep deployment; skip container image build/push and app update"
+      echo "  --deployment-mode    Deploy all environment variables or only container-apps/databases"
       exit 0
       ;;
     *)
@@ -49,7 +64,7 @@ init_command_log "provision-env"
 DEPLOYMENT_NAME="$(deployment_name)"
 IMAGE_TAG="$(image_tag)"
 CLIENT_IP="$(curl -s https://ifconfig.me)"
-export DEPLOYMENT_NAME IMAGE_TAG CLIENT_IP
+export DEPLOYMENT_NAME DEPLOYMENT_MODE IMAGE_TAG CLIENT_IP
 
 # Set the subscription context for Azure CLI commands
 run az account set --subscription "$SUBSCRIPTION_ID"
@@ -159,11 +174,11 @@ step "Checking if image exists in ACR..."
 # `api:<env>` tag can be missing (first deploy, or after a `--shared`
 # teardown). Fall back to the helloworld image in that case — the real image is
 # pushed by `az acr build` below (set -e does not trigger inside `if`).
-if run_hide_stderr az acr repository show-tags -n "$(registry_name)" --repository api | grep -q "$ENVIRONMENT"; then
-  success "  Image api:$ENVIRONMENT exists in ACR, using it for deployment."
-  IMAGE="$(login_server)/api:$ENVIRONMENT"
+if run_hide_stderr az acr repository show-tags -n "$(registry_name)" --repository api | grep -q "latest"; then
+  success "  Image api:latest exists in ACR, using it for deployment."
+  IMAGE="$(login_server)/api:latest"
 else
-  warn "  api:$ENVIRONMENT tag not found in $(registry_name), using default image for deployment."
+  warn "  api:latest tag not found in $(registry_name), using default image for deployment."
   IMAGE="mcr.microsoft.com/azuredocs/containerapps-helloworld:latest"
 fi
 export IMAGE
@@ -208,7 +223,7 @@ if [[ "$ACTION" == "what-if" ]]; then
   exit 0
 fi
 
-if [[ "$BICEP_ONLY" == "1" ]]; then
+if [[ "$BICEP_ONLY" == "1" || "$DEPLOYMENT_MODE" == "container-apps" ]]; then
   success "Bicep deployment completed. Stopping due to --bicep-only flag."
   success "Run the following manually to complete the deployment:"
   success "  ./scripts/publish-containers.sh --update-apps"

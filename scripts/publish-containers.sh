@@ -54,58 +54,14 @@ if [[ "$ACTION" != "create" && "$ACTION" != "what-if" ]]; then
   exit 1
 fi
 
-if [[ "$BICEP_ONLY" == "1" && "$ACTION" == "what-if" ]]; then
-  error "--bicep-only is not compatible with --action what-if"
-  exit 1
-fi
-
-if [[ -z "$TAG" ]]; then
-  error "--tag requires a value"
-  exit 1
-fi
-
-init_command_log "publish-containers"
-
-# Get client IP and mint the timestamped deployment name + image tag
-DEPLOYMENT_NAME="$(deployment_name)"
-IMAGE_TAG="$(image_tag)"
-CLIENT_IP="$(curl -s https://ifconfig.me)"
-export DEPLOYMENT_NAME IMAGE_TAG CLIENT_IP
-
-# Set the subscription context for Azure CLI commands
-run az account set --subscription "$SUBSCRIPTION_ID"
-
-# Verify the environment resource group exists
-step "Checking resource group $RG_NAME..."
-if ! RG_STATE=$(run_hide_stderr az group show --name "$RG_NAME" --query properties.provisioningState -o tsv); then
-  error "Resource group $RG_NAME does not exist. Run provision-env.sh first."
-  exit 1
-fi
-if [[ "$RG_STATE" == "Deleting" ]]; then
-  error "Resource group $RG_NAME is still deleting."
-  exit 1
-fi
-
-# Fetch Bicep deployment outputs (registry, loginServer, appName, fqdn)
-step "Fetching Bicep deployment outputs..."
-DEPLOYMENT_OUTPUTS="$(fetch_deployment_outputs "$DEPLOYMENT_NAME" \
-  "[properties.outputs.registryName.value, properties.outputs.loginServer.value, properties.outputs.appName.value, properties.outputs.fqdn.value]" 4)" || exit 1
-IFS=$'\t' read -r REGISTRY LOGIN_SERVER APP_NAME FQDN <<< "$DEPLOYMENT_OUTPUTS" || true
-
-log_vars \
-  "REGISTRY=$REGISTRY" \
-  "LOGIN_SERVER=$LOGIN_SERVER" \
-  "APP_NAME=$APP_NAME" \
-  "FQDN=$FQDN"
-
-if [[ "$(login_server)" != "$LOGIN_SERVER" ]]; then
-  error "Login server mismatch"
-  exit 1
-fi
-
 if [[ "$ACTION" == "what-if" ]]; then
   success "What-if analysis completed. No changes were made."
   exit 0
+fi
+
+if [[ "$BICEP_ONLY" == "1" && "$ACTION" == "what-if" ]]; then
+  error "--bicep-only is not compatible with --action what-if"
+  exit 1
 fi
 
 if [[ "$BICEP_ONLY" == "1" ]]; then
@@ -118,6 +74,21 @@ if [[ "$BICEP_ONLY" == "1" ]]; then
   fi
   exit 0
 fi
+
+if [[ -z "$TAG" ]]; then
+  error "--tag requires a value"
+  exit 1
+fi
+
+init_command_log "publish-containers"
+
+# Get client IP and mint the timestamped deployment name + image tag
+DEPLOYMENT_NAME="$(deployment_name)"
+IMAGE_TAG="$(image_tag)"
+export DEPLOYMENT_NAME IMAGE_TAG
+
+# Set the subscription context for Azure CLI commands
+run az account set --subscription "$SUBSCRIPTION_ID"
 
 # --- Auto-discover containers under $ROOT ---
 # A "container" is any directory directly under $ROOT that contains a Dockerfile
@@ -150,7 +121,7 @@ for container in "${CONTAINERS[@]}"; do
 
   step "Building and pushing $IMAGE_NAME image to ACR..."
   # Push the user-specified tag (default: latest) + unique timestamp tag
-  run az acr build -r "$REGISTRY" -t "$IMAGE_NAME:$TAG" -t "$IMAGE_NAME:$IMAGE_TAG" "$ROOT/$container"
+  run az acr build -r "$(registry_name)" -t "$IMAGE_NAME:$TAG" -t "$IMAGE_NAME:$IMAGE_TAG" "$ROOT/$container"
 done
 
 # If --update-apps is not set, we're done after pushing images
@@ -158,6 +129,34 @@ if [[ "$UPDATE_APPS" == "0" ]]; then
   success "Container images built and pushed with tags: $TAG, $IMAGE_TAG"
   success "Run with --update-apps to update Container Apps and run health checks."
   exit 0
+fi
+
+# Verify the environment resource group exists
+step "Checking resource group $RG_NAME..."
+if ! RG_STATE=$(run_hide_stderr az group show --name "$RG_NAME" --query properties.provisioningState -o tsv); then
+  error "Resource group $RG_NAME does not exist. Run provision-env.sh first."
+  exit 1
+fi
+if [[ "$RG_STATE" == "Deleting" ]]; then
+  error "Resource group $RG_NAME is still deleting."
+  exit 1
+fi
+
+# Fetch Bicep deployment outputs (registry, loginServer, appName, fqdn)
+step "Fetching Bicep deployment outputs..."
+DEPLOYMENT_OUTPUTS="$(fetch_deployment_outputs "$DEPLOYMENT_NAME" \
+  "[properties.outputs.registryName.value, properties.outputs.loginServer.value, properties.outputs.appName.value, properties.outputs.fqdn.value]" 4)" || exit 1
+IFS=$'\t' read -r REGISTRY LOGIN_SERVER APP_NAME FQDN <<< "$DEPLOYMENT_OUTPUTS" || true
+
+log_vars \
+  "REGISTRY=$REGISTRY" \
+  "LOGIN_SERVER=$LOGIN_SERVER" \
+  "APP_NAME=$APP_NAME" \
+  "FQDN=$FQDN"
+
+if [[ "$(login_server)" != "$LOGIN_SERVER" ]]; then
+  error "Login server mismatch"
+  exit 1
 fi
 
 # --- Update Container Apps and health checks ---

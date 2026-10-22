@@ -97,6 +97,30 @@ deployment_name() {
   printf '%s\n' "$DEPLOYMENT_NAME"
 }
 
+# Subscription-deployment names must be unique per `az deployment sub create`
+# run: re-using a name overwrites history and can confuse `sub show` output
+# lookups. So each deployment gets a timestamped name
+# (`<base>-<env>-YYYYmmdd-HHMMSS`), recorded in $LAST_DEPLOYMENT_FILE.
+# Set REUSE_DEPLOYMENT=1 to re-run against the previous name (e.g. debugging
+# a failed deployment) instead of minting a new one.
+#
+# Names are minted lazily via `deployment_name` (and `image_tag` below), not
+# at source time: merely sourcing this file (e.g. provision-all.sh, which never
+# deploys directly) must not reserve a name in $LAST_DEPLOYMENT_FILE.
+export LAST_DEPLOYMENT_FILE="${TMPDIR:-/tmp}/memorywell-${BASE_NAME}-${ENVIRONMENT}.deployment"
+deployment_name() {
+  if [[ -z "${DEPLOYMENT_NAME:-}" ]]; then
+    if [[ -n "${REUSE_DEPLOYMENT:-}" && -f "$LAST_DEPLOYMENT_FILE" ]]; then
+      DEPLOYMENT_NAME="$(cat "$LAST_DEPLOYMENT_FILE")"
+    else
+      DEPLOYMENT_NAME="${BASE_NAME}-${ENVIRONMENT}-$(date -u +%Y%m%d-%H%M%S)"
+      printf '%s' "$DEPLOYMENT_NAME" > "$LAST_DEPLOYMENT_FILE"
+    fi
+    export DEPLOYMENT_NAME
+  fi
+  printf '%s\n' "$DEPLOYMENT_NAME"
+}
+
 # Image tag is derived from the deployment timestamp so every `provision-env.sh` run
 # pushes a unique tag (`<env>-YYYYmmdd-HHMMSS`). Re-pushing the floating
 # `api:<env>` tag alone does not change the Container App template string,
