@@ -181,12 +181,12 @@ record that decision here.
 
 ## Non-message triggers & paths (Functions) — **planned/stub** (Phase 3)
 
-| Trigger / path                 | Handler                       | Emitter / source                 | Purpose                                                                                                   | Status          |
-| ------------------------------ | ----------------------------- | -------------------------------- | --------------------------------------------------------------------------------------------------------- | --------------- |
-| Timer (daily)                  | `functions/timer_cadence`     | Azure Functions schedule         | Cadence sweep per (chronicle, contributor); emits `checkin.due` when due (real filtering in Phase 4a)     | stub (P3)       |
-| Cosmos change feed             | `functions/cosmos_changefeed` | `memories` container change feed | Embedding generation + cache refresh on new/updated memories (Phase 4b)                                   | stub (P3)       |
-| HTTP `POST /api/invites/claim` | `functions/http_invite_claim` | web invite magic link            | Claim invite → write household membership; returns Event Grid `validationCode` handshake for its endpoint | stub (P3)       |
-| DLQ monitor / resubmit         | script or Function + alert    | any queue/subscription DLQ       | Peek failed messages, re-send after fix; alert on DLQ depth (alerting wired in Phase 7)                   | documented (P3) |
+| Trigger / path                 | Handler                       | Emitter / source                 | Purpose                                                                                                                    | Status          |
+| ------------------------------ | ----------------------------- | -------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | --------------- |
+| Timer (daily)                  | `functions/timer_cadence`     | Azure Functions schedule         | Cadence sweep per (chronicle, contributor); emits `checkin.due` when due (real filtering in Phase 4a)                      | stub (P3)       |
+| Cosmos change feed             | `functions/cosmos_changefeed` | `memories` container change feed | Embedding generation + cache refresh on new/updated memories (Phase 4b)                                                    | stub (P3)       |
+| HTTP `POST /api/invites/claim` | `functions/http_invite_claim` | web invite magic link            | Claim invite → write household membership (single-use token, expiry; Phase 5/8). Event Grid validation stays on `/api/log` | stub (P3)       |
+| DLQ monitor / resubmit         | script or Function + alert    | any queue/subscription DLQ       | Peek failed messages, re-send after fix; alert on DLQ depth (alerting wired in Phase 7)                                    | documented (P3) |
 
 DLQ philosophy: bounded redelivery (`maxDeliveryCount`) + explicit resubmit path,
 not retry-forever — a poison message must never block the queue. Commands:
