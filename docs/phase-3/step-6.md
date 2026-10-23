@@ -109,9 +109,8 @@ with an identity-based connection:
 { name: 'AzureWebJobsStorage__clientId', value: identityClientId }
 ```
 
-That needs the identity's **client ID**, so add an `identityClientId` param to
-`functions.bicep` and thread `identity.outputs.clientId` through
-`platform.bicep`.
+That needs the identity's **client ID** — reuse the `identityClientId` param and
+`identity.outputs.clientId` threading that step 4 added for Service Bus.
 
 `infra/modules/storage.bicep` — add the deployment container next to
 `eventgrid-dlq` (suggested name `app-package-func-<base>-<env>`) and output its
