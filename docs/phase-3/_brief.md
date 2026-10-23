@@ -43,7 +43,8 @@ OpenTelemetry wiring (Phase 7). No pre-building later phases.
 - Connect/consume: **Event Grid** custom events with **filters**, retry policies,
   and routing to Functions.
 - Connect/consume: **Azure Functions** triggers and bindings — timer, Service Bus,
-  Cosmos change feed, HTTP — on the consumption plan.
+  Cosmos change feed, HTTP — on the consumption plan. Step 6 migrates the app to
+  Flex Consumption (no always-ready instances).
 - Secure: managed identity for the Function App to Service Bus / Cosmos / Key
   Vault; connection settings via app settings + Key Vault references.
 - Containerized solutions are untouched this phase (API container stays as-is).
@@ -65,7 +66,7 @@ OpenTelemetry wiring (Phase 7). No pre-building later phases.
 | 3    | [step-3.md](step-3.md) | Group C — Functions scaffold + timer trigger (cadence sweep) |
 | 4    | [step-4.md](step-4.md) | Group D — Service Bus triggers (transcription, guardian)     |
 | 5    | [step-5.md](step-5.md) | Group E — Change feed (embeddings) + HTTP invite claim       |
-| 6    | [step-6.md](step-6.md) | Group F — Wiring + deploy + hygiene                          |
+| 6    | [step-6.md](step-6.md) | Group F — Wiring + deploy + hygiene + Flex migration         |
 
 Do not start a step before the previous one verifies. No Phase 4 work starts
 until the §6 review gate passes.
@@ -75,7 +76,8 @@ until the §6 review gate passes.
 ```plaintext
 infra/modules/servicebus.bicep   # Group A: namespace + queue + topic + subs + DLQ
 infra/modules/eventgrid.bicep    # Group B: domain + event subscriptions
-infra/modules/functions.bicep    # Group C–E: Function App (consumption) + plan + storage
+infra/modules/functions.bicep    # Group C: Function App (consumption) + plan + storage;
+                                 # step 6 switches it to Flex Consumption (FC1)
 infra/modules/platform.bicep    # + servicebus/eventgrid/functions composition (edit only)
 infra/modules/vault.bicep       # + Service Bus connection string? (prefer identity)
 functions/host.json             # Functions host config
@@ -86,7 +88,8 @@ functions/sb_transcription/__init__.py
 functions/sb_guardian/__init__.py
 functions/cosmos_changefeed/__init__.py
 functions/http_invite_claim/__init__.py
-scripts/...                    # no new scripts expected; deploy.sh gains functions deploy
+scripts/...                    # no new scripts expected; provision-env.sh and
+                               # publish-functions.sh gain the Functions deploy
 docs/phase-3/                  # this brief + one step-x.md per step
 ```
 
@@ -109,4 +112,5 @@ Paste back into chat:
 Agent sanity-checks the above, then issues the Phase 4a brief. No Phase 4 work
 starts until the gate passes. Cost reminder: destroy resources between sessions
 (`scripts/teardown.sh`); Phase 3 adds Service Bus Basic + Event Grid + Functions
-consumption (near-zero when idle) + storage account.
+Flex Consumption with no always-ready instances (near-zero when idle) + storage
+account.

@@ -180,7 +180,8 @@ memorywell/
                 (container.json: image/app/health/bruno metadata for publishing)
   functions/    Python Functions (timer check-ins/nudges, SB transcription worker,
                 SB guardian reviewer, change feed embeddings, HTTP invite claim, DLQ)
-                (consumption plan; code ships with scripts/publish-functions.sh)
+                (Flex Consumption plan, no always-ready instances; code ships
+                with scripts/publish-functions.sh)
   web/          Frontend (Vite + React: Drop Zone, timeline, owner review queue)
 docs/         architecture.md, EVENTS.md (event catalog: emitter/consumer/purpose),
                 AI-200 skills-to-components matrix, KQL queries
@@ -243,7 +244,8 @@ human validates and merges each step before the next one starts.
 ## Cost & safety
 
 - Cheapest viable SKUs: Cosmos serverless, Postgres Burstable B1s, Redis Basic,
-  Container Apps scale-to-zero, Functions consumption
+  Container Apps scale-to-zero, Functions Flex Consumption (no always-ready
+  instances)
 - Estimated **~$50-90/month** while running
 - `scripts/teardown.sh` destroys everything between study sessions
 - Secrets never committed to the repo
