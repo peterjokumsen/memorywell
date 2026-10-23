@@ -13,7 +13,9 @@ targetScope = 'resourceGroup'
 param inputs ResourceGroupInputs
 param storageAccountId string
 param storageAccountName string
-param identityId string = ''
+param serviceBusNamespace string
+param identityClientId string
+param identityId string
 
 // Names are globally unique for the Function App (it owns
 // <appName>.azurewebsites.net), which is why the hostname is an output the
@@ -46,14 +48,12 @@ resource app 'Microsoft.Web/sites@2023-12-01' = {
   location: inputs.global.location
   tags: inputs.tags
   kind: 'functionapp,linux'
-  identity: !empty(identityId)
-    ? {
-        type: 'UserAssigned'
-        userAssignedIdentities: {
-          '${identityId}': {}
-        }
-      }
-    : null
+  identity: {
+    type: 'UserAssigned'
+    userAssignedIdentities: {
+      '${identityId}': {}
+    }
+  }
   properties: {
     serverFarmId: plan.id
     reserved: true
@@ -77,6 +77,12 @@ resource app 'Microsoft.Web/sites@2023-12-01' = {
           name: 'FUNCTIONS_WORKER_RUNTIME'
           value: 'python'
         }
+        {
+          name: 'ServiceBusConnection__fullyQualifiedNamespace'
+          value: '${serviceBusNamespace}.servicebus.windows.net'
+        }
+        { name: 'ServiceBusConnection__credential', value: 'managedidentity' }
+        { name: 'ServiceBusConnection__clientId', value: identityClientId }
       ]
     }
   }

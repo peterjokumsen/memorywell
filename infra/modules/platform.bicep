@@ -5,6 +5,7 @@ targetScope = 'resourceGroup'
 param inputs ResourceGroupInputs
 param acrLoginServer string
 param identityId string
+param identityClientId string
 param identityPrincipalId string
 param deployEventSubscriptions bool
 @secure()
@@ -118,6 +119,7 @@ module serviceBus 'servicebus.bicep' = if (!databaseOnly) {
   name: '${deployment().name}-sb'
   params: {
     inputs: inputs
+    identityPrincipalId: identityPrincipalId
   }
 }
 
@@ -129,6 +131,8 @@ module functions 'functions.bicep' = if (!databaseOnly) {
     inputs: inputs
     storageAccountId: storage.outputs.storageAccountId
     storageAccountName: storage.outputs.storageAccountName
+    serviceBusNamespace: serviceBus!.outputs.namespaceName
+    identityClientId: identityClientId
     identityId: identityId
   }
 }

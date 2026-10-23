@@ -123,6 +123,7 @@ module platform './modules/platform.bicep' = {
     inputs: inputs
     acrLoginServer: acr.properties.loginServer
     identityId: identity.outputs.id
+    identityClientId: identity.outputs.clientId
     identityPrincipalId: identity.outputs.principalId
     deployEventSubscriptions: deployEventSubscriptions
     postgresAdministrationPassword: postgresAdministratorPassword

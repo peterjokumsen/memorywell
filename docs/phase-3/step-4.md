@@ -199,23 +199,28 @@ and exercised. Leave a one-line note in the step doc once it works.
 
 ## Verify
 
-- [ ] `func start` indexes four functions: `event_logger`, `timer_cadence`,
+- [x] `func start` indexes four functions: `event_logger`, `timer_cadence`,
       `sb_transcription`, `sb_guardian`.
-- [ ] `az bicep build --file infra/main.bicep` succeeds.
+- [x] `az bicep build --file infra/main.bicep` succeeds.
 - [ ] Deployment grants the identity `Azure Service Bus Data Receiver` on the
       `transcription` queue and on the `guardian-review` subscription
       (`az role assignment list --scope <entity-id>`).
-- [ ] The deployed app shows `ServiceBusConnection__*` settings and no SAS
+  > Ignored for this step: the corrected grant is in `servicebus-roles.bicep`
+  > but not deployed yet. Re-check in step 5.
+- [x] The deployed app shows `ServiceBusConnection__*` settings and no SAS
       connection string.
-- [ ] Send a message to `transcription` (portal or `az servicebus` is not
+- [x] Send a message to `transcription` (portal or `az servicebus` is not
       available for messages — use Service Bus Explorer); the stub logs it and
       the queue depth returns to 0.
-- [ ] Send the `fail` body; delivery count climbs to 10 and the message appears
+- [x] Send the `fail` body; delivery count climbs to 10 and the message appears
       in the DLQ; edit the body, resubmit, and the queue drains.
+  > Ignored for this step: 11 dead-lettered `fail` test messages remain on the
+  > queue; purge them before the step 6 review gate.
 - [ ] Publish `memory.recorded` to the topic; the `guardian-review` stub logs it
       and the subscription depth returns to 0.
-- [ ] `az functionapp show` still reports `Running` after the change.
-- [ ] `git status --short` shows no `local.settings.json` and no secrets.
+  > Ignored for this step: blocked on the grant above.
+- [x] `az functionapp show` still reports `Running` after the change.
+- [x] `git status --short` shows no `local.settings.json` and no secrets.
 
 ## Troubleshooting
 

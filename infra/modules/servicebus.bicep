@@ -1,6 +1,7 @@
 import { ResourceGroupInputs, ServiceBusTopics } from './_types.bicep'
 
 param inputs ResourceGroupInputs
+param identityPrincipalId string
 
 resource ns 'Microsoft.ServiceBus/namespaces@2024-01-01' = {
   name: 'sb-${inputs.global.baseName}-${inputs.global.environment}'
@@ -23,11 +24,12 @@ resource queue 'Microsoft.ServiceBus/namespaces/queues@2024-01-01' = {
   }
 }
 
+var recordedTopic = 'memory.recorded'
 var embeddingSub = 'memory-writer'
 var digestSub = 'memory-digest'
 var guardianSub = 'guardian-review'
 var topicConfigs array = [
-  { name: 'memory.recorded', subs: [embeddingSub, digestSub, guardianSub] }
+  { name: recordedTopic, subs: [embeddingSub, digestSub, guardianSub] }
   { name: 'memory.flagged', subs: [] }
   { name: 'alias.requested', subs: [guardianSub] }
   { name: 'alias.updated', subs: [guardianSub] }
@@ -53,11 +55,24 @@ module subs 'servicebus-subs.bicep' = [
   }
 ]
 
+module receiverRoles 'servicebus-roles.bicep' = {
+  name: '${deployment().name}-roles'
+  params: {
+    identityPrincipalId: identityPrincipalId
+    namespaceName: ns.name
+    queueName: queue.name
+    topicSubscriptions: [
+      { topic: recordedTopic, sub: guardianSub }
+    ]
+  }
+  dependsOn: subs
+}
+
 output namespaceName string = ns.name
 output queueName string = queue.name
 output topicNames array = [for t in topicConfigs: t.name]
 output topics ServiceBusTopics = {
-  memoryRecorded: 'memory.recorded'
+  memoryRecorded: recordedTopic
   memoryFlagged: 'memory.flagged'
   aliasRequested: 'alias.requested'
   aliasUpdated: 'alias.updated'
