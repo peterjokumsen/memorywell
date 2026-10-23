@@ -65,9 +65,10 @@ az containerapp delete -n "ca-${BASE_NAME}-${ENVIRONMENT}-logger" -g "$RG_NAME" 
 
 ## Verify
 
-- [ ] `func start` (local, if Functions Core Tools installed) runs without
+- [x] `func start` (local, if Functions Core Tools installed) runs without
       import errors; timer trigger registers.
-- [ ] `az functionapp show` → state `Running`; runtime `python`, version `3.11`.
+- [x] `az functionapp show` → state `Running`; runtime `python`, version `3.11`.
 - [ ] First timer invocation appears in logs (wait for schedule or run manually
       via portal "Run").
-- [ ] No secrets in `functions/` or committed config.
+  > Skipped for later
+- [x] No secrets in `functions/` or committed config.
