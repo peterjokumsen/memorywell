@@ -40,6 +40,9 @@ var containers = [
   { name: 'transcripts', pk: '/chronicleId' }
   { name: 'flags', pk: '/chronicleId' }
   { name: 'aliasHistory', pk: '/chronicleId' }
+  // Change-feed processor leases for the memories trigger. The partition key
+  // must be /id; the extension can create it, but IaC owns the container shape.
+  { name: 'leases', pk: '/id' }
 ]
 
 resource containersLoop 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers@2025-10-15' = [

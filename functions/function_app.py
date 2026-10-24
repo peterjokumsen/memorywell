@@ -16,14 +16,18 @@ HTTP endpoints added in later steps set their own level and key/identity check.
 """
 
 import azure.functions as func
+from cosmos_changefeed import bp as cosmos_changefeed_bp
 from event_logger import bp as event_logger_bp
+from http_invite_claim import bp as http_invite_claim_bp
 from sb_guardian import bp as sb_guardian_bp
 from sb_transcription import bp as sb_transcription_bp
 from timer_cadence import bp as timer_cadence_bp
 
 app = func.FunctionApp(http_auth_level=func.AuthLevel.ANONYMOUS)
 
+app.register_blueprint(cosmos_changefeed_bp)
 app.register_blueprint(event_logger_bp)
+app.register_blueprint(http_invite_claim_bp)
 app.register_blueprint(timer_cadence_bp)
 app.register_blueprint(sb_guardian_bp)
 app.register_blueprint(sb_transcription_bp)

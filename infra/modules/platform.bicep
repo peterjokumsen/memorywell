@@ -132,6 +132,7 @@ module functions 'functions.bicep' = if (!databaseOnly) {
     storageAccountId: storage.outputs.storageAccountId
     storageAccountName: storage.outputs.storageAccountName
     serviceBusNamespace: serviceBus!.outputs.namespaceName
+    cosmosAccountEndpoint: cosmos.?outputs.accountEndpoint ?? ''
     identityClientId: identityClientId
     identityId: identityId
   }
