@@ -20,7 +20,7 @@
 - Each phase still gets `docs/phase-<n>/_brief.md` (goal, AI-200 concepts, prerequisites, ordered-step index, file outline, review gate) plus one `step-x.md` per step. Write the brief before code and update it if implementation forces a deviation.
 - Each step is one handoff cycle:
   1. **Agent starts the step branch** `phase-<n>/step-<x>` from `phase-<n>`, implements the step, and runs the local gates (`pytest`, Ruff, `az bicep build`, `bash -n`, `./scripts/check-logging.sh`) until green.
-  2. **Agent documents** it in `step-x.md`: a short `## What changed` / `## Why` summary (files touched, behaviour, decisions and trade-offs) and a `## Validate` section with exact commands and expected output.
+  2. **Agent documents** it in `step-x.md`: a short `## What changed` / `## Why` summary (files touched, behaviour, decisions and trade-offs), a concise `## ELI5` that explains the step's core idea in plain language (one short paragraph or analogy, no jargon), and a `## Validate` section with exact commands and expected output.
   3. **Agent opens a PR** from `phase-<n>/step-<x>` into `phase-<n>` and stops; that PR is the review surface for the step.
   4. **Human validates** the PR — runs the checks, demos the behaviour, and may push adjustments to the same branch.
   5. **Agent reviews the human's adjustments** — the diff against the step's intent, repo conventions, and domain invariants — and reports findings: confirm, suggest a correction, or ask before changing anything the human wrote. The agent never silently reverts human edits, and pushes any fixes to the same branch.

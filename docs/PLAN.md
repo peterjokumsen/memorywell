@@ -197,8 +197,10 @@ memorywell/
    runs the local gates (`pytest`, Ruff, `az bicep build`, `bash -n`,
    `./scripts/check-logging.sh`) until green.
 3. Agent records a short `## What changed` / `## Why` summary in `step-x.md`
-   (files touched, behaviour, decisions and trade-offs) plus a `## Validate`
-   section with exact commands and expected output.
+   (files touched, behaviour, decisions and trade-offs), a concise `## ELI5` that
+   explains the step's core idea in plain language (one short paragraph or
+   analogy, no jargon), and a `## Validate` section with exact commands and
+   expected output.
 4. Agent opens a PR from `phase-<n>/step-<x>` into `phase-<n>` and stops; that PR
    is the review surface for the step.
 5. Human validates the PR — runs the checks, demos the behaviour, may adjust the
