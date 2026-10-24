@@ -193,20 +193,24 @@ memorywell/
    what to demo before proceeding. Each ordered step gets its own
    `docs/phase-<n>/step-x.md` with its scope, implementation notes, and
    validation checks.
-2. Agent implements the step and runs the local gates (`pytest`, Ruff,
-   `az bicep build`, `bash -n`, `./scripts/check-logging.sh`) until green.
+2. Agent cuts `phase-<n>/step-<x>` from `phase-<n>`, implements the step, and
+   runs the local gates (`pytest`, Ruff, `az bicep build`, `bash -n`,
+   `./scripts/check-logging.sh`) until green.
 3. Agent records a short `## What changed` / `## Why` summary in `step-x.md`
    (files touched, behaviour, decisions and trade-offs) plus a `## Validate`
-   section with exact commands and expected output, then stops.
-4. Human validates the step — runs the checks, demos the behaviour, may adjust
-   the code, config, or docs — and hands any adjustments back.
-5. Agent reviews the human's adjustments (diff against the step's intent, repo
+   section with exact commands and expected output.
+4. Agent opens a PR from `phase-<n>/step-<x>` into `phase-<n>` and stops; that PR
+   is the review surface for the step.
+5. Human validates the PR — runs the checks, demos the behaviour, may adjust the
+   code, config, or docs, and pushes adjustments to the same branch.
+6. Agent reviews the human's adjustments (diff against the step's intent, repo
    conventions, and domain invariants) and reports findings: confirm, suggest a
    correction, or ask before changing anything the human wrote. The agent never
-   silently reverts human edits.
-6. The step closes when both sides agree; only then does the agent start the next
-   step. A phase closes when every step is closed and the phase review gate in
-   `_brief.md` passes.
+   silently reverts human edits, and pushes any fixes to the same branch.
+7. The step closes when the human merges the step PR into `phase-<n>`; only then
+   does the agent start the next step. A phase closes when every step is closed,
+   the phase review gate in `_brief.md` passes, and the `phase-<n>` PR into
+   `main` is merged.
 
 | #   | Phase                | Contents                                                                                                                                                                                                                                       |
 | --- | -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -222,8 +226,9 @@ memorywell/
 | 8   | Productization       | Multi-household invites, milestone grouping polish, digest generation, JSON export / physical-book stub; freemium noted as future, out of scope                                                                                                |
 
 **Phases run in the order above**, sequentially, one step at a time — no
-skipping ahead, no pre-implementation of later steps or phases. The human
-validates each step before the next one starts.
+skipping ahead, no pre-implementation of later steps or phases. Each phase uses a
+`phase-<n>` branch, each step a `phase-<n>/step-<x>` branch PR'd into it, and the
+human validates and merges each step before the next one starts.
 
 ---
 

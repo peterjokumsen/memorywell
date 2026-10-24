@@ -5,9 +5,13 @@
 
 ## Workflow
 
-- Changes land via branch + PR into `main` (precedent: #1). Do not push to `main` directly.
+- `main` is the integration branch for finished phases. Do not push to `main` directly.
+- Each phase gets a long-lived `phase-<n>` branch cut from `main` (e.g. `phase-3`, `phase-4a`).
+- Each step gets a `phase-<n>/step-<x>` branch cut from `phase-<n>` (e.g. `phase-3/step-4`). One step per branch, one PR from `phase-<n>/step-<x>` into `phase-<n>` — that PR is the review surface for the step. Do not commit directly to `phase-<n>`; it advances only by merging step PRs, and step branches are deleted after merge.
+- A phase closes with a PR from `phase-<n>` into `main` once every step is signed off and the phase review gate passes.
+- Docs/tooling changes that are not phase work use their own branch (e.g. `docs/<topic>`) and PR straight into `main`.
 - After checkout run `pre-commit install` once; hooks run on `git commit` and only touch staged files. Never `pre-commit run --all-files` except for a deliberate baseline.
-- `.github/workflows/ci.yml` is the merge gate (pre-commit, `pytest`, `az bicep build`, `bash -n`, `./scripts/check-logging.sh`). Every PR into `main` must be green; fix locally first (`pytest` in `api/`, `./scripts/validate-bicep.sh`, `./scripts/check-logging.sh`).
+- `.github/workflows/ci.yml` is the merge gate (pre-commit, `pytest`, `az bicep build`, `bash -n`, `./scripts/check-logging.sh`) for PRs into `main` and `phase-*`. Every PR must be green; fix locally first (`pytest` in `api/`, `./scripts/validate-bicep.sh`, `./scripts/check-logging.sh`).
 
 ## Build mode: agent-implements, human-validates
 
@@ -15,15 +19,16 @@
 - Work stays strictly sequential in `docs/PLAN.md` phase order: one step at a time, no skipping ahead, no pre-implementation of later steps or phases.
 - Each phase still gets `docs/phase-<n>/_brief.md` (goal, AI-200 concepts, prerequisites, ordered-step index, file outline, review gate) plus one `step-x.md` per step. Write the brief before code and update it if implementation forces a deviation.
 - Each step is one handoff cycle:
-  1. **Agent implements** the step and runs the local gates (`pytest`, Ruff, `az bicep build`, `bash -n`, `./scripts/check-logging.sh`) until green.
+  1. **Agent starts the step branch** `phase-<n>/step-<x>` from `phase-<n>`, implements the step, and runs the local gates (`pytest`, Ruff, `az bicep build`, `bash -n`, `./scripts/check-logging.sh`) until green.
   2. **Agent documents** it in `step-x.md`: a short `## What changed` / `## Why` summary (files touched, behaviour, decisions and trade-offs) and a `## Validate` section with exact commands and expected output.
-  3. **Human validates** — runs the checks, demos the behaviour, and may make adjustments to the code, config, or docs.
-  4. **Agent reviews the human's adjustments** — the diff against the step's intent, repo conventions, and domain invariants — and reports findings: confirm, suggest a correction, or ask before changing anything the human wrote. The agent never silently reverts human edits.
-  5. **Step closes** when both sides agree. Only then does the agent start the next step.
+  3. **Agent opens a PR** from `phase-<n>/step-<x>` into `phase-<n>` and stops; that PR is the review surface for the step.
+  4. **Human validates** the PR — runs the checks, demos the behaviour, and may push adjustments to the same branch.
+  5. **Agent reviews the human's adjustments** — the diff against the step's intent, repo conventions, and domain invariants — and reports findings: confirm, suggest a correction, or ask before changing anything the human wrote. The agent never silently reverts human edits, and pushes any fixes to the same branch.
+  6. **Step closes** when the human merges the step PR into `phase-<n>`. Only then does the agent start the next step.
 - Keep `## Validate` copy-pasteable: one command sequence where possible, so sign-off is a single run rather than a hunt.
 - The agent never asks the human to run something it can run locally. Azure mutations stay human-run (provision, deploy, teardown) unless explicitly delegated; the agent authors the Bicep/scripts and validates them locally.
 - Anything outside the current step's scope goes into `docs/PLAN.md` first as a follow-up step — no silent scope creep.
-- This applies to in-flight work too: when an existing phase's step is picked up under the new mode, its step doc is updated to the handoff format above.
+- This applies to in-flight work too: when an existing phase's step is picked up under the new mode, its step doc is updated to the handoff format above and its work moves to a `phase-<n>/step-<x>` branch; steps already on the phase branch stay there.
 
 ## Repo rules
 
