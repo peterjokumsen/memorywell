@@ -5,23 +5,35 @@
 
 ## Workflow
 
-- Changes land via branch + PR into `main` (precedent: #1). Do not push to `main` directly.
+- `main` is the integration branch for finished phases. Do not push to `main` directly.
+- Each phase gets a long-lived `phase-<n>` branch cut from `main` (e.g. `phase-3`, `phase-4a`).
+- Each step gets a `phase-<n>/step-<x>` branch cut from `phase-<n>` (e.g. `phase-3/step-4`). One step per branch, one PR from `phase-<n>/step-<x>` into `phase-<n>` — that PR is the review surface for the step. Do not commit directly to `phase-<n>`; it advances only by merging step PRs, and step branches are deleted after merge.
+- A phase closes with a PR from `phase-<n>` into `main` once every step is signed off and the phase review gate passes.
+- Docs/tooling changes that are not phase work use their own branch (e.g. `docs/<topic>`) and PR straight into `main`.
 - After checkout run `pre-commit install` once; hooks run on `git commit` and only touch staged files. Never `pre-commit run --all-files` except for a deliberate baseline.
-- `.github/workflows/ci.yml` is the merge gate (pre-commit, `pytest`, `az bicep build`, `bash -n`, `./scripts/check-logging.sh`). Every PR into `main` must be green; fix locally first (`pytest` in `api/`, `./scripts/validate-bicep.sh`, `./scripts/check-logging.sh`).
+- `.github/workflows/ci.yml` is the merge gate (pre-commit, `pytest`, `az bicep build`, `bash -n`, `./scripts/check-logging.sh`) for PRs into `main` and `phase-*`. Every PR must be green; fix locally first (`pytest` in `api/`, `./scripts/validate-bicep.sh`, `./scripts/check-logging.sh`).
 
-## Build mode: learning-first, agent-guided
+## Build mode: agent-implements, human-validates
 
-- The human builds by hand for AI-200 learning. The agent does **not** big-bang implement.
-- Work is strictly sequential, starting at **Phase 1**. One phase at a time, no skipping ahead, no pre-implementation of future phases.
-- Each phase follows this contract:
-  1. Agent writes a per-phase directory `docs/phase-<n>/`: `_brief.md` (goal, AI-200 concepts, prerequisites, ordered-step index, basic file outline (paths + stubs, **not** full implementations), demo/review gate) plus one `step-x.md` per ordered step carrying that step's instructions, stub shapes/notes, and its manual verification checks.
-  2. Human implements following the brief. Agent answers questions and unblocks on errors but does not take over.
-  3. Agent sanity-checks what was built (human pastes/shows output) before issuing the next phase brief.
+- The agent implements the majority of the code. The human's job is to validate each step and learn from the what/why summary, not to type the implementation.
+- Work stays strictly sequential in `docs/PLAN.md` phase order: one step at a time, no skipping ahead, no pre-implementation of later steps or phases.
+- Each phase still gets `docs/phase-<n>/_brief.md` (goal, AI-200 concepts, prerequisites, ordered-step index, file outline, review gate) plus one `step-x.md` per step. Write the brief before code and update it if implementation forces a deviation.
+- Each step is one handoff cycle:
+  1. **Agent starts the step branch** `phase-<n>/step-<x>` from `phase-<n>`, implements the step, and runs the local gates (`pytest`, Ruff, `az bicep build`, `bash -n`, `./scripts/check-logging.sh`) until green.
+  2. **Agent documents** it in `step-x.md`: a short `## What changed` / `## Why` summary (files touched, behaviour, decisions and trade-offs), a concise `## ELI5` that explains the step's core idea in plain language (one short paragraph or analogy, no jargon), and a `## Validate` section with exact commands and expected output.
+  3. **Agent opens a PR** from `phase-<n>/step-<x>` into `phase-<n>` and stops; that PR is the review surface for the step.
+  4. **Human validates** the PR — runs the checks, demos the behaviour, and may push adjustments to the same branch.
+  5. **Agent reviews the human's adjustments** — the diff against the step's intent, repo conventions, and domain invariants — and reports findings: confirm, suggest a correction, or ask before changing anything the human wrote. The agent never silently reverts human edits, and pushes any fixes to the same branch.
+  6. **Step closes** when the human merges the step PR into `phase-<n>`. Only then does the agent start the next step.
+- Keep `## Validate` copy-pasteable: one command sequence where possible, so sign-off is a single run rather than a hunt.
+- The agent never asks the human to run something it can run locally. Azure mutations stay human-run (provision, deploy, teardown) unless explicitly delegated; the agent authors the Bicep/scripts and validates them locally.
+- Anything outside the current step's scope goes into `docs/PLAN.md` first as a follow-up step — no silent scope creep.
+- This applies to in-flight work too: when an existing phase's step is picked up under the new mode, its step doc is updated to the handoff format above and its work moves to a `phase-<n>/step-<x>` branch; steps already on the phase branch stay there.
 
 ## Repo rules
 
 - Planned layout (`docs/PLAN.md` § Repo layout): `infra/ api/ functions/ web/ docs/ scripts/`. Scaffold only what the current phase brief needs.
-- Current tree is docs-only plus an empty untracked `api/` — `infra/ functions/ web/ scripts/` do not exist on `main` yet. Never assume code exists; check first.
+- Never assume the tree: check before planning or scaffolding (`git ls-tree --name-only origin/main`, `ls`). `infra/ api/ functions/ scripts/` exist; `web/` does not yet.
 - No pnpm workspace: when `web/` arrives (Phase 5), use a plain package manager inside `web/` only.
 - Azure-first on the AI-200 stack; IaC is Bicep.
 - Cheapest viable SKUs (Cosmos serverless, Postgres Burstable B1s, Redis Basic, Container Apps scale-to-zero, Functions consumption). Estimated ~$50–90/mo while running.
@@ -43,5 +55,5 @@
 
 ## Verification
 
-- Per-phase manual checks + `pytest` per agent as defined in `docs/PLAN.md` § Verification.
+- Per-phase manual checks + `pytest` per agent as defined in `docs/PLAN.md` § Verification. The agent runs them before each handoff; the human re-runs the step's `## Validate` block at sign-off.
 - Final gate: scheduled check-in → voice-note reply → transcript in timeline → Guardian pass → review queue empty; plus alias-rename and flagged-content runs.

@@ -1,14 +1,15 @@
 name: ci
 
-# Gate for merging into main: everything here must pass on the PR head.
-# Mirrors .pre-commit-config.yaml plus the real test/lint/build steps that
-# pre-commit cannot run (pytest needs the api/ dependency set, bicep needs the
-# compiler). Deploys are separate — see teardown.yml and docs/CI_TEARDOWN.md.
+# Gate for merging into main and phase branches: everything here must pass on
+# the PR head. Mirrors .pre-commit-config.yaml plus the real test/lint/build
+# steps that pre-commit cannot run (pytest needs the api/ dependency set, bicep
+# needs the compiler). Deploys are separate — see teardown.yml and
+# docs/CI_TEARDOWN.md.
 on:
   push:
     branches: [main]
   pull_request:
-    branches: [main]
+    branches: [main, "phase-*"]
   workflow_dispatch:
 
 permissions:

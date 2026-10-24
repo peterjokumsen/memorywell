@@ -8,12 +8,12 @@ loop: Prompter (asks), Curator (stores), Guardian (flags for owner review).
 The backend is built entirely on the AI-200 (Developing AI Cloud Solutions
 on Azure) stack, which remains the core learning goal.
 
-> **Status:** Planning complete. Build not started.
-> **Target repo for the build:** `~/repos/memorywell` (this repo is the planning space).
-> **Build mode: learning-first, agent-guided.** Each phase is done mostly by hand
-> for AI-200 learning. The AI agent does NOT big-bang implement; per phase it
-> provides a short documentation pack (what/why, instructional steps, file
-> outline), then reviews what was built before the next phase starts.
+> **Status:** Phases 1–2 merged; Phase 3 (messaging) in progress.
+> **Target repo for the build:** `~/repos/memorywell` (this repo).
+> **Build mode: agent-implements, human-validates.** The agent writes the code,
+> one step at a time, and hands each step back with a short what/why summary plus
+> exact validation checks. The human validates, may adjust, and signs off before
+> the next step starts.
 
 ---
 
@@ -188,15 +188,31 @@ memorywell/
 
 **Phase execution contract (applies to every phase below):**
 
-1. Agent writes a phase brief as `docs/phase-<n>/_brief.md`: goal, AI-200
-   concepts, prerequisites, the ordered-step index, basic file outline (paths +
-   stubs, not full implementations), and what to demo before proceeding. Each
-   ordered step gets its own `docs/phase-<n>/step-x.md` with that step's
-   instructions, stub shapes/notes, and manual verification checks.
-2. Human builds it by hand following the brief (agent answers questions,
-   unblocks on errors, but does not take over implementation).
-3. Brief closes with a review gate: what to show / paste back so the agent can
-   sanity-check before the next phase brief is issued.
+1. Agent writes a phase brief as `docs/phase-<n>/_brief.md` before coding: goal,
+   AI-200 concepts, prerequisites, the ordered-step index, the file outline, and
+   what to demo before proceeding. Each ordered step gets its own
+   `docs/phase-<n>/step-x.md` with its scope, implementation notes, and
+   validation checks.
+2. Agent cuts `phase-<n>/step-<x>` from `phase-<n>`, implements the step, and
+   runs the local gates (`pytest`, Ruff, `az bicep build`, `bash -n`,
+   `./scripts/check-logging.sh`) until green.
+3. Agent records a short `## What changed` / `## Why` summary in `step-x.md`
+   (files touched, behaviour, decisions and trade-offs), a concise `## ELI5` that
+   explains the step's core idea in plain language (one short paragraph or
+   analogy, no jargon), and a `## Validate` section with exact commands and
+   expected output.
+4. Agent opens a PR from `phase-<n>/step-<x>` into `phase-<n>` and stops; that PR
+   is the review surface for the step.
+5. Human validates the PR — runs the checks, demos the behaviour, may adjust the
+   code, config, or docs, and pushes adjustments to the same branch.
+6. Agent reviews the human's adjustments (diff against the step's intent, repo
+   conventions, and domain invariants) and reports findings: confirm, suggest a
+   correction, or ask before changing anything the human wrote. The agent never
+   silently reverts human edits, and pushes any fixes to the same branch.
+7. The step closes when the human merges the step PR into `phase-<n>`; only then
+   does the agent start the next step. A phase closes when every step is closed,
+   the phase review gate in `_brief.md` passes, and the `phase-<n>` PR into
+   `main` is merged.
 
 | #   | Phase                | Contents                                                                                                                                                                                                                                       |
 | --- | -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -211,8 +227,10 @@ memorywell/
 | 7   | Observability        | OpenTelemetry end-to-end, KQL workbook (incl. flag rate), DLQ alert                                                                                                                                                                            |
 | 8   | Productization       | Multi-household invites, milestone grouping polish, digest generation, JSON export / physical-book stub; freemium noted as future, out of scope                                                                                                |
 
-**Build starts at Phase 1** (full plan, sequential, one brief at a time — no
-skipping ahead, no agent pre-implementation).
+**Phases run in the order above**, sequentially, one step at a time — no
+skipping ahead, no pre-implementation of later steps or phases. Each phase uses a
+`phase-<n>` branch, each step a `phase-<n>/step-<x>` branch PR'd into it, and the
+human validates and merges each step before the next one starts.
 
 ---
 
@@ -237,6 +255,8 @@ skipping ahead, no agent pre-implementation).
 - Final end-to-end run: scheduled check-in -> voice-note reply -> transcript appears
   in the timeline -> Guardian pass with no flag -> owner review queue empty;
   plus alias-rename run and a flagged-content run
+- Agent runs the checks above before each handoff; the human re-runs the step's
+  `## Validate` block at sign-off.
 
 ---
 
