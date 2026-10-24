@@ -63,7 +63,7 @@ EXPLICIT_MODE=0
 while [[ $# -gt 0 ]]; do
   arg="$1"
   case "$arg" in
-    --auto) AUTO_DISCOVER=1; EXPLICIT_MODE=1 ;;
+    --auto) AUTO_DISCOVER=1; EXPLICIT_MODE=0 ;;
     --env-only) CHECK_SHARED=0; EXPLICIT_MODE=1 ;;
     --shared-only) CHECK_ENV=0; EXPLICIT_MODE=1 ;;
     --summary) SUMMARY=1 ;;
@@ -94,7 +94,7 @@ fi
 
 # --rg= with nothing after it would otherwise fall through to the full report,
 # silently ignoring the flag.
-if [[ -n "${RG_ONLY+x}" && -z "$RG_ONLY" ]]; then
+if [[ "$AUTO_DISCOVER" != "1" && -n "${RG_ONLY+x}" && -z "$RG_ONLY" ]]; then
   error "--rg needs a resource group name"
   usage >&2
   exit 64
