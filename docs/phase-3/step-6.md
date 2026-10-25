@@ -29,16 +29,20 @@ The existing `Microsoft.Web/sites@2023-12-01` already exposes
   `alwaysReady` unset. If the sweep ever needs to be punctual, add
   `alwaysReady: [{ name: 'timer_cadence', instanceCount: 1 }]` as its own change
   and accept the baseline cost.
+  > Do not need the timer to react immediately, so cold start will be fine.
 - **Keep the app name `func-<base>-<env>` (decided).** It's the Event Grid
   destination and the Bruno `fns_url`; recreating under a new name means
   re-pointing both for no benefit.
+  > Keep the nme
 - **Reuse the environment storage account (decided).** One LRS account, as
   today. Add a dedicated deployment container rather than sharing
   `eventgrid-dlq`.
+  > Yes
 - **Switch `AzureWebJobsStorage` to the managed identity in this step
   (decided).** Flex has no Azure Files requirement, so the key-based connection
   string built with `listKeys()` can go. This is the Phase 3 shortcut flagged in
   `functions.bicep`, and the migration is the natural point to remove it.
+  > Agreed
 - **`instanceMemoryMB: 2048`, `maximumInstanceCount: 5` (decided).** 2048 MB is
   the documented default for Python workloads; the ceiling is generous for one
   household and bounds accidental scale-out. Per-function scaling applies the
@@ -152,52 +156,52 @@ old app must be gone before the new template is deployed.
 
 ## Wiring checklist
 
-- [ ] `platform.bicep` calls `servicebus.bicep`, `eventgrid.bicep`,
+- [x] `platform.bicep` calls `servicebus.bicep`, `eventgrid.bicep`,
       `functions.bicep` with the right params.
-- [ ] `main.bicep` / `main.bicepparam` thread any new params (Function App
+- [x] `main.bicep` / `main.bicepparam` thread any new params (Function App
       name, etc.) and client IP if needed.
-- [ ] Function App identity granted:
+- [x] Function App identity granted:
   - Service Bus Data Receiver (on queue) + Data Sender (where it publishes).
   - Cosmos Built-in Data Contributor at database scope (change feed reads).
   - Key Vault Secrets User (if connection strings stored).
   - Storage Blob Data Owner + Storage Table Data Contributor (host storage).
-- [ ] App settings: `SERVICEBUS_NAMESPACE`, `COSMOS_ENDPOINT`,
+- [x] App settings: `SERVICEBUS_NAMESPACE`, `COSMOS_ENDPOINT`,
       `COSMOS_DATABASE`, `EVENTGRID_TOPIC_ENDPOINT`, Key Vault refs for any
       secrets. No secrets in repo or Bicep outputs. `AzureWebJobsStorage` is
       identity-based, not a connection string.
-- [ ] `scripts/provision-env.sh --bicep-only` deploys infra, then
+- [x] `scripts/provision-env.sh --bicep-only` deploys infra, then
       `scripts/publish-functions.sh` deploys code. Keep infra and code deploy
       steps distinct in the script output.
-- [ ] Stale "Consumption" comments and docstrings corrected in
+- [x] Stale "Consumption" comments and docstrings corrected in
       `functions.bicep` (including the timer claim in the header),
       `scripts/common.sh`, `scripts/publish-functions.sh`,
       `functions/function_app.py`.
-- [ ] `scripts/teardown.sh` still destroys everything (now including Service
+- [x] `scripts/teardown.sh` still destroys everything (now including Service
       Bus, Event Grid, Functions, storage).
 
 ## Verify
 
-- [ ] `az bicep build --file infra/main.bicep` succeeds.
-- [ ] `az functionapp show` → state `Running`; `serverFarmId` points at the
+- [x] `az bicep build --file infra/main.bicep` succeeds.
+- [x] `az functionapp show` → state `Running`; `serverFarmId` points at the
       `FC1` plan.
-- [ ] `az functionapp show --query "siteConfig.linuxFxVersion"` is empty, and
+- [x] `az functionapp show --query "siteConfig.linuxFxVersion"` is empty, and
       `functionAppConfig.runtime` is `python` / `3.11`.
-- [ ] `az functionapp config appsettings list` shows
+- [x] `az functionapp config appsettings list` shows
       `AzureWebJobsStorage__accountName` / `__credential` / `__clientId` and no
       `AccountKey=` connection string.
-- [ ] `az role assignment list --scope <storage-id>` shows the storage roles
+- [x] `az role assignment list --scope <storage-id>` shows the storage roles
       for the identity.
-- [ ] The deployment container exists (`az storage container exists`).
-- [ ] The app starts and triggers register with no storage key available — the
+- [x] The deployment container exists (`az storage container exists`).
+- [x] The app starts and triggers register with no storage key available — the
       real test of the identity wiring.
-- [ ] All triggers register in the Function App (portal "Functions" list).
-- [ ] Event Grid validation handshake succeeds on the second pass; a test event
+- [x] All triggers register in the Function App (portal "Functions" list).
+- [x] Event Grid validation handshake succeeds on the second pass; a test event
       reaches `/api/log`.
-- [ ] Timer fires at 08:00 UTC. Cold start is expected and acceptable (no
+- [x] Timer fires at 08:00 UTC. Cold start is expected and acceptable (no
       always-ready); record the observed delay in the review-gate paste-back.
-- [ ] `./scripts/teardown.sh` destroys all Phase 3 resources; re-deploy from
+- [x] `./scripts/teardown.sh` destroys all Phase 3 resources; re-deploy from
       scratch works.
-- [ ] `git status --short` shows no `.env`, no secrets, no `local.settings.json`.
+- [x] `git status --short` shows no `.env`, no secrets, no `local.settings.json`.
 
 ## Troubleshooting
 

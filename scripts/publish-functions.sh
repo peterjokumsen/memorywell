@@ -43,7 +43,7 @@ step "Checking Function App $FUNCTION_APP_NAME..."
 if ! APP_STATE=$(run_hide_stderr az functionapp show \
   --name "$FUNCTION_APP_NAME" \
   --resource-group "$RG_NAME" \
-  --query state -o tsv) || [[ -z "$APP_STATE" ]]; then
+  --query properties.state -o tsv) || [[ -z "$APP_STATE" ]]; then
   error "Function App $FUNCTION_APP_NAME not found in $RG_NAME."
   error "Deploy the infrastructure first: ./scripts/provision-env.sh --bicep-only"
   exit 1
