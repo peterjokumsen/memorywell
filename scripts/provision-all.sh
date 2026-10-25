@@ -75,8 +75,8 @@ fi
 
 if [[ "$BICEP_ONLY" == "0" ]]; then
   step "Publishing containers..."
-  container_args=("--action" "$ACTION")
-  run "$SCRIPT_DIR/publish-containers.sh" "${container_args[@]}"
+  # publish-containers.sh renders no Bicep, so --action does not apply.
+  run "$SCRIPT_DIR/publish-containers.sh"
 fi
 
 step "Provisioning environment resources..."

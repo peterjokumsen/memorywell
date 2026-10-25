@@ -1,0 +1,79 @@
+import { ResourceGroupInputs, ServiceBusTopics } from './_types.bicep'
+
+param inputs ResourceGroupInputs
+param identityPrincipalIds string[]
+
+resource ns 'Microsoft.ServiceBus/namespaces@2024-01-01' = {
+  name: 'sb-${inputs.global.baseName}-${inputs.global.environment}'
+  location: inputs.global.location
+  tags: inputs.tags
+  sku: {
+    name: 'Standard'
+    tier: 'Standard'
+  }
+  properties: {}
+}
+
+resource queue 'Microsoft.ServiceBus/namespaces/queues@2024-01-01' = {
+  parent: ns
+  name: 'transcription'
+  properties: {
+    deadLetteringOnMessageExpiration: true
+    maxDeliveryCount: 10
+    lockDuration: 'PT30S'
+  }
+}
+
+var recordedTopic = 'memory.recorded'
+var embeddingSub = 'memory-writer'
+var digestSub = 'memory-digest'
+var guardianSub = 'guardian-review'
+var topicConfigs array = [
+  { name: recordedTopic, subs: [embeddingSub, digestSub, guardianSub] }
+  { name: 'memory.flagged', subs: [] }
+  { name: 'alias.requested', subs: [guardianSub] }
+  { name: 'alias.updated', subs: [guardianSub] }
+]
+
+resource topics 'Microsoft.ServiceBus/namespaces/topics@2024-01-01' = [
+  for topic in topicConfigs: {
+    parent: ns
+    name: topic.name
+    properties: {}
+  }
+]
+
+module subs 'servicebus-subs.bicep' = [
+  for topic in topicConfigs: {
+    name: '${deployment().name}-${topic.name}-subs'
+    params: {
+      namespaceName: ns.name
+      topicName: topic.name
+      subNames: topic.subs
+    }
+    dependsOn: topics
+  }
+]
+
+module receiverRoles 'servicebus-roles.bicep' = {
+  name: '${deployment().name}-roles'
+  params: {
+    identityPrincipalIds: identityPrincipalIds
+    namespaceName: ns.name
+    queueName: queue.name
+    topicSubscriptions: [
+      { topic: recordedTopic, sub: guardianSub }
+    ]
+  }
+  dependsOn: subs
+}
+
+output namespaceName string = ns.name
+output queueName string = queue.name
+output topicNames array = [for t in topicConfigs: t.name]
+output topics ServiceBusTopics = {
+  memoryRecorded: recordedTopic
+  memoryFlagged: 'memory.flagged'
+  aliasRequested: 'alias.requested'
+  aliasUpdated: 'alias.updated'
+}

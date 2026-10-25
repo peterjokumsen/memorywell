@@ -1,0 +1,37 @@
+info:
+  name: Validate Event Grid Subscription
+  type: http
+  seq: 2
+
+http:
+  method: POST
+  url: "{{fns_url}}/api/log"
+  headers:
+    - name: Content-Type
+      value: application/json
+  body:
+    type: json
+    data: |-
+      [
+        {
+          "id": "2d1e9a44-0d8f-4c31-9a5a-6b1e2f7c9d02",
+          "eventType": "Microsoft.EventGrid.SubscriptionValidationEvent",
+          "subject": "",
+          "eventTime": "2026-10-22T20:00:00Z",
+          "dataVersion": "2.0",
+          "metadataVersion": "1",
+          "topic": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-memwell-dev/providers/Microsoft.EventGrid/domains/evg-memwell-dev",
+          "data": {
+            "validationCode": "512d38b6-c7b8-40c8-89fe-f46f9e9622b6",
+            "validationUrl": "https://rp-westeurope.eventgrid.azure.net:553/eventsubscriptions/example/validate?id=placeholder"
+          }
+        }
+      ]
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

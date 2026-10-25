@@ -1,11 +1,12 @@
 import { ResourceGroupInputs } from './_types.bicep'
 
 param inputs ResourceGroupInputs
+param managedEnvironmentId string
+param identityId string
+param acrLoginServer string
 param monitorCustomerId string
 param monitorWorkspaceId string
 param monitorApiVersion string
-param identityId string
-param acrLoginServer string
 param env {
   cosmosDatabase: string
   cosmosEndpoint: string
@@ -70,7 +71,7 @@ resource containerApp 'Microsoft.App/containerApps@2025-07-01' = {
     }
   }
   properties: {
-    managedEnvironmentId: managedEnvironment.id
+    managedEnvironmentId: managedEnvironmentId
     configuration: {
       ingress: {
         external: true

@@ -7,7 +7,7 @@
 
 - `main` is the integration branch for finished phases. Do not push to `main` directly.
 - Each phase gets a long-lived `phase-<n>` branch cut from `main` (e.g. `phase-3`, `phase-4a`).
-- Each step gets a `phase-<n>/step-<x>` branch cut from `phase-<n>` (e.g. `phase-3/step-4`). One step per branch, one PR from `phase-<n>/step-<x>` into `phase-<n>` — that PR is the review surface for the step. Do not commit directly to `phase-<n>`; it advances only by merging step PRs, and step branches are deleted after merge.
+- Each step gets a `phase-<n>_step-<x>` branch cut from `phase-<n>` (e.g. `phase-3_step-4`). One step per branch, one PR from `phase-<n>_step-<x>` into `phase-<n>` — that PR is the review surface for the step. Do not commit directly to `phase-<n>`; it advances only by merging step PRs, and step branches are deleted after merge.
 - A phase closes with a PR from `phase-<n>` into `main` once every step is signed off and the phase review gate passes.
 - Docs/tooling changes that are not phase work use their own branch (e.g. `docs/<topic>`) and PR straight into `main`.
 - After checkout run `pre-commit install` once; hooks run on `git commit` and only touch staged files. Never `pre-commit run --all-files` except for a deliberate baseline.
@@ -34,9 +34,10 @@
 
 - Planned layout (`docs/PLAN.md` § Repo layout): `infra/ api/ functions/ web/ docs/ scripts/`. Scaffold only what the current phase brief needs.
 - Never assume the tree: check before planning or scaffolding (`git ls-tree --name-only origin/main`, `ls`). `infra/ api/ functions/ scripts/` exist; `web/` does not yet.
+- `docs/EVENTS.md` is the central event catalog (event, emitter, consumer, purpose). Any new/renamed event, subscription, queue, or trigger updates it in the same PR.
 - No pnpm workspace: when `web/` arrives (Phase 5), use a plain package manager inside `web/` only.
 - Azure-first on the AI-200 stack; IaC is Bicep.
-- Cheapest viable SKUs (Cosmos serverless, Postgres Burstable B1s, Redis Basic, Container Apps scale-to-zero, Functions consumption). Estimated ~$50–90/mo while running.
+- Cheapest viable SKUs (Cosmos serverless, Postgres Burstable B1s, Redis Basic, Container Apps scale-to-zero, Functions Flex Consumption with no always-ready instances). Estimated ~$50–90/mo while running.
 - `scripts/teardown.sh` must exist from early on; destroy resources between study sessions. The shared resource group (`rg-<base>-shared`, holds the cross-environment ACR) is kept by default — pass `--shared` to delete it too.
 - Secrets never committed. Managed identities + Key Vault references everywhere. `.env` stays local/ignored.
 

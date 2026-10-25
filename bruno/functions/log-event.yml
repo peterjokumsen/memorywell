@@ -1,0 +1,38 @@
+info:
+  name: Log Event (Event Grid)
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: "{{fns_url}}/api/log"
+  headers:
+    - name: Content-Type
+      value: application/json
+  body:
+    type: json
+    data: |-
+      [
+        {
+          "id": "6f2a1f3e-36f7-4e2f-9d5b-1c0f3a5d7e11",
+          "eventType": "memory.recorded",
+          "subject": "/chronicles/chr_demo/memories/mem_0001",
+          "eventTime": "2026-10-22T20:00:00Z",
+          "dataVersion": "1.0",
+          "metadataVersion": "1",
+          "topic": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-memwell-dev/providers/Microsoft.EventGrid/domains/evg-memwell-dev",
+          "data": {
+            "chronicleId": "chr_demo",
+            "memoryId": "mem_0001",
+            "authorId": "usr_owner"
+          }
+        }
+      ]
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

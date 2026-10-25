@@ -1,7 +1,7 @@
 import { ResourceGroupInputs } from './_types.bicep'
 
 param inputs ResourceGroupInputs
-param identityPrincipalId string
+param identityPrincipalIds string[]
 
 resource account 'Microsoft.DocumentDB/databaseAccounts@2025-10-15' = {
   name: inputs.global.cosmosAccountName
@@ -40,6 +40,9 @@ var containers = [
   { name: 'transcripts', pk: '/chronicleId' }
   { name: 'flags', pk: '/chronicleId' }
   { name: 'aliasHistory', pk: '/chronicleId' }
+  // Change-feed processor leases for the memories trigger. The partition key
+  // must be /id; the extension can create it, but IaC owns the container shape.
+  { name: 'leases', pk: '/id' }
 ]
 
 resource containersLoop 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers@2025-10-15' = [
@@ -92,12 +95,8 @@ resource containersLoop 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/cont
 // is not implicitly readable.
 var cosmosDataContributorRoleId = '00000000-0000-0000-0000-000000000002'
 
-// filter() drops the developer principal when it was not supplied, so a fresh
-// clone without the env var still deploys instead of failing on an empty id.
-var dataPrincipals = filter([identityPrincipalId, inputs.global.cosmosPrincipalObjectId], p => p != '')
-
 resource dataRoles 'Microsoft.DocumentDB/databaseAccounts/sqlRoleAssignments@2025-10-15' = [
-  for principal in dataPrincipals: {
+  for principal in identityPrincipalIds: {
     parent: account
     name: guid(database.id, principal, cosmosDataContributorRoleId)
     properties: {

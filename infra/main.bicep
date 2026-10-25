@@ -16,8 +16,12 @@ param postgresClientIp string
 param postgresKeyName string
 param cosmosAccountName string
 param cosmosDatabase string
-param cosmosPrincipalObjectId string
+param developerPrincipalObjectId string
 param redisKeyName string
+// Event Grid webhook subscriptions are only valid once the Function App they
+// point at is answering its validation handshake. provision-env.sh deploys
+// twice on a full run: infrastructure with this false, then code, then true.
+param deployEventSubscriptions bool = true
 
 @secure()
 param postgresAdministratorPassword string
@@ -36,7 +40,7 @@ var globalInputs GlobalInputs = {
   postgresClientIp: !empty(postgresClientIp) && length(postgresClientIp) > 8
     ? postgresClientIp
     : fail('postgresClientIp is not set or has length less than 8')
-  cosmosPrincipalObjectId: cosmosPrincipalObjectId
+  developerPrincipalObjectId: environment != 'dev' ? '' : developerPrincipalObjectId
   keys: {
     postgres: !empty(postgresKeyName) ? postgresKeyName : fail('postgresSecretKey is not set')
     redis: !empty(redisKeyName) ? redisKeyName : fail('redisSecretKey is not set')
@@ -119,7 +123,9 @@ module platform './modules/platform.bicep' = {
     inputs: inputs
     acrLoginServer: acr.properties.loginServer
     identityId: identity.outputs.id
-    identityPrincipalId: identity.outputs.principalId
+    identityClientId: identity.outputs.clientId
+    identityPrincipalIds: filter([identity.outputs.principalId, inputs.global.developerPrincipalObjectId], p => p != '')
+    deployEventSubscriptions: deployEventSubscriptions
     postgresAdministrationPassword: postgresAdministratorPassword
   }
   // No output links platform to acrPull, so order it explicitly: the app must
@@ -133,3 +139,6 @@ output registryName string = acr.name
 output loginServer string = acr.properties.loginServer
 output appName string = platform.outputs.appName
 output fqdn string = platform.outputs.fqdn
+output functionAppName string = platform.outputs.functionAppName
+output functionAppFqdn string = platform.outputs.functionAppFqdn
+output functionLogUrl string = platform.outputs.functionLogUrl

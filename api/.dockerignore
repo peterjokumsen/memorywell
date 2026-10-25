@@ -11,3 +11,5 @@ venv/
 tests/
 .git/
 .vscode/
+# Container manifest is publish metadata, not application code
+container.json
