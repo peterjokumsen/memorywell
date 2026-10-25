@@ -7,7 +7,7 @@
 
 - `main` is the integration branch for finished phases. Do not push to `main` directly.
 - Each phase gets a long-lived `phase-<n>` branch cut from `main` (e.g. `phase-3`, `phase-4a`).
-- Each step gets a `phase-<n>/step-<x>` branch cut from `phase-<n>` (e.g. `phase-3/step-4`). One step per branch, one PR from `phase-<n>/step-<x>` into `phase-<n>` — that PR is the review surface for the step. Do not commit directly to `phase-<n>`; it advances only by merging step PRs, and step branches are deleted after merge.
+- Each step gets a `phase-<n>_step-<x>` branch cut from `phase-<n>` (e.g. `phase-3_step-4`). One step per branch, one PR from `phase-<n>_step-<x>` into `phase-<n>` — that PR is the review surface for the step. Do not commit directly to `phase-<n>`; it advances only by merging step PRs, and step branches are deleted after merge.
 - A phase closes with a PR from `phase-<n>` into `main` once every step is signed off and the phase review gate passes.
 - Docs/tooling changes that are not phase work use their own branch (e.g. `docs/<topic>`) and PR straight into `main`.
 - After checkout run `pre-commit install` once; hooks run on `git commit` and only touch staged files. Never `pre-commit run --all-files` except for a deliberate baseline.
