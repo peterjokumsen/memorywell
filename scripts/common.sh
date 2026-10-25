@@ -48,7 +48,7 @@ SHARED_ACR_NAME="$(echo "acr${BASE_NAME}" | tr '[:upper:]' '[:lower:]' | tr -d '
 # soft-deleted vault keeps the old name reserved until it is purged.
 VAULT_NAME="kv-${BASE_NAME}-${ENVIRONMENT}"
 COSMOS_ACCOUNT_NAME="cosmos-${BASE_NAME}-${ENVIRONMENT}"
-# Consumption-plan Function App name. It must match infra/modules/functions.bicep,
+# Flex Consumption Function App name. It must match infra/modules/functions.bicep,
 # and it owns a globally unique <name>.azurewebsites.net hostname, so scripts read
 # the FQDN back from Azure instead of rebuilding the URL.
 FUNCTION_APP_NAME="func-${BASE_NAME}-${ENVIRONMENT}"

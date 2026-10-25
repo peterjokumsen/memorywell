@@ -129,8 +129,8 @@ module functions 'functions.bicep' = if (!databaseOnly) {
   name: '${deployment().name}-functions'
   params: {
     inputs: inputs
-    storageAccountId: storage.outputs.storageAccountId
     storageAccountName: storage.outputs.storageAccountName
+    deploymentContainerName: storage.outputs.deploymentContainerName
     serviceBusNamespace: serviceBus!.outputs.namespaceName
     cosmosAccountEndpoint: cosmos.?outputs.accountEndpoint ?? ''
     identityClientId: identityClientId
