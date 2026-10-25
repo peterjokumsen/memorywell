@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Publish the Python Function App code with Azure Functions Core Tools.
 #
-# The Function App itself (consumption plan, Python 3.11) is deployed by
+# The Function App itself (Flex Consumption, Python 3.11) is deployed by
 # infra/modules/functions.bicep through provision-env.sh; this script only ships
 # the code in functions/ (zip deploy + remote build) and points Bruno at the
 # resulting hostname. Run it after a successful Bicep deployment.
@@ -57,7 +57,7 @@ fi
 
 step "Publishing $ROOT/functions to $FUNCTION_APP_NAME..."
 # Core Tools detects the Python worker from host.json/function_app.py and, for a
-# Linux consumption app, builds requirements.txt remotely. Run from functions/
+# Flex app, builds requirements.txt remotely. Run from functions/
 # so only the project is zipped (the local .venv and local.settings.json are
 # excluded by .funcignore).
 (

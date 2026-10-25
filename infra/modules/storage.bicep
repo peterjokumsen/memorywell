@@ -29,6 +29,12 @@ resource dlqContainer 'Microsoft.Storage/storageAccounts/blobServices/containers
   name: 'eventgrid-dlq'
 }
 
+resource deploymentContainer 'Microsoft.Storage/storageAccounts/blobServices/containers@2023-01-01' = {
+  parent: blobService
+  name: toLower('app-package-func-${inputs.global.baseName}-${inputs.global.environment}')
+}
+
 output storageAccountId string = sa.id
 output storageAccountName string = sa.name
 output dlqContainerName string = dlqContainer.name
+output deploymentContainerName string = deploymentContainer.name

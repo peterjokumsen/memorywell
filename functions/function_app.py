@@ -8,7 +8,7 @@ correct its code is.
 Every trigger module therefore exposes a ``bp = func.Blueprint()`` and is
 registered below.
 
-Hosting: a Linux consumption-plan Function App (infra/modules/functions.bicep).
+Hosting: a Flex Consumption (FC1) Function App (infra/modules/functions.bicep).
 It does have the usual function-key store (AzureWebJobsStorage), but the log
 sink still defaults to ANONYMOUS: an Event Grid webhook destination cannot send
 a function key, and the sink exists to receive those deliveries. Authenticated
