@@ -45,6 +45,28 @@ def cosmos_changefeed(documents: func.DocumentList) -> None:
         )
 ```
 
+Used 4.x variant of trigger, to be able to run locally. `create_lease_container_if_not_exists` had to be set to false, which works because `leases` created in bicep.
+
+```python
+@bp.cosmos_db_trigger(
+    arg_name="documents",
+    connection="CosmosDBConnection",
+    database_name="memorywell",
+    container_name="memories",
+    lease_container_name="leases",
+    lease_database_name="memorywell",
+    create_lease_container_if_not_exists=False,
+    start_from_beginning=False,
+)
+def cosmos_changefeed(documents: func.DocumentList) -> None:
+    for document in documents:
+        logging.info(
+            "change feed: id=%s chronicleId=%s",
+            document.get("id"),
+            document.get("chronicleId"),
+        )
+```
+
 `start_from_beginning=False` matters: with a fresh lease container the
 processor starts at "now" instead of replaying every memory in the container. A
 redeploy resumes from the checkpoint, not from the beginning.
@@ -84,7 +106,7 @@ CosmosDBConnection__clientId        = <app identity client ID>
 Local runs: add **only** `CosmosDBConnection__accountEndpoint` to
 `functions/local.settings.json` (no `__credential`), then `az login`. Your
 developer principal already has the Cosmos data role via
-`COSMOS_USER_OBJECT_ID` from Phase 2.
+`DEVELOPER_OBJECT_ID` from Phase 2.
 
 `container-apps` mode is the wrinkle: `cosmos.bicep` is skipped there but the
 Function App still deploys for the Event Grid sink. So `platform.bicep` passes
@@ -165,23 +187,23 @@ app.register_blueprint(http_invite_claim_bp)
 
 ## Verify
 
-- [ ] `func start` indexes six functions: `event_logger`, `timer_cadence`,
+- [x] `func start` indexes six functions: `event_logger`, `timer_cadence`,
       `sb_transcription`, `sb_guardian`, `cosmos_changefeed`,
       `http_invite_claim`.
-- [ ] `az bicep build --file infra/main.bicep` succeeds.
-- [ ] `leases` exists with partition key `/id`
+- [x] `az bicep build --file infra/main.bicep` succeeds.
+- [x] `leases` exists with partition key `/id`
       (`az cosmosdb sql container show … --query "resource.partitionKey"`).
-- [ ] The deployed app shows `CosmosDBConnection__*` and no Cosmos key.
-- [ ] Insert a document into `memories` (Data Explorer → New Item) with `id` and
+- [x] The deployed app shows `CosmosDBConnection__*` and no Cosmos key.
+- [x] Insert a document into `memories` (Data Explorer → New Item) with `id` and
       `chronicleId` set; `func start` logs `change feed: id=…` within a few
       seconds.
-- [ ] Restart the app, insert a second document; only the new one is logged (no
+- [x] Restart the app, insert a second document; only the new one is logged (no
       replay of the container).
-- [ ] `curl -X POST http://localhost:7071/api/invites/claim` → 400;
+- [x] `curl -X POST http://localhost:7071/api/invites/claim` → 400;
       `?token=abc` → 200 with `{"status":"stub","claimed":false}`.
-- [ ] Regression: a `SubscriptionValidationEvent` posted to `/api/log` still
+- [x] Regression: a `SubscriptionValidationEvent` posted to `/api/log` still
       returns `validationResponse`.
-- [ ] `git status --short` shows no `local.settings.json` and no secrets.
+- [x] `git status --short` shows no `local.settings.json` and no secrets.
 
 Deployed log checks are local-only for now: the app still has no
 `APPLICATIONINSIGHTS_CONNECTION_STRING`, and built-in log streaming is not

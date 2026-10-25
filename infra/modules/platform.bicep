@@ -6,7 +6,7 @@ param inputs ResourceGroupInputs
 param acrLoginServer string
 param identityId string
 param identityClientId string
-param identityPrincipalId string
+param identityPrincipalIds string[]
 param deployEventSubscriptions bool
 @secure()
 param postgresAdministrationPassword string
@@ -41,11 +41,11 @@ module managedEnvironment 'managed-environment.bicep' = {
   }
 }
 
-module keyVault 'vault.bicep' = if (!containerOnly) {
+module keyVault 'key-vault.bicep' = if (!containerOnly) {
   name: '${deployment().name}-keyvault'
   params: {
     inputs: inputs
-    identityPrincipalId: identityPrincipalId
+    identityPrincipalIds: identityPrincipalIds
   }
 }
 
@@ -53,7 +53,7 @@ module cosmos 'cosmos.bicep' = if (!containerOnly) {
   name: '${deployment().name}-cosmos'
   params: {
     inputs: inputs
-    identityPrincipalId: identityPrincipalId
+    identityPrincipalIds: identityPrincipalIds
   }
 }
 
@@ -119,7 +119,7 @@ module serviceBus 'servicebus.bicep' = if (!databaseOnly) {
   name: '${deployment().name}-sb'
   params: {
     inputs: inputs
-    identityPrincipalId: identityPrincipalId
+    identityPrincipalIds: identityPrincipalIds
   }
 }
 

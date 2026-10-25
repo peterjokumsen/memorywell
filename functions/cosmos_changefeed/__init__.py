@@ -24,13 +24,14 @@ import azure.functions as func
 bp = func.Blueprint()
 
 
-@bp.cosmos_db_trigger_v3(
+@bp.cosmos_db_trigger(
     arg_name="documents",
+    connection="CosmosDBConnection",
     database_name="memorywell",
-    collection_name="memories",
-    connection_string_setting="CosmosDBConnection",
-    lease_collection_name="leases",
-    create_lease_collection_if_not_exists=True,
+    container_name="memories",
+    lease_container_name="leases",
+    lease_database_name="memorywell",
+    create_lease_container_if_not_exists=False,
     start_from_beginning=False,
 )
 def cosmos_changefeed(documents: func.DocumentList) -> None:

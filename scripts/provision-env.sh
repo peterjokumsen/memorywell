@@ -216,7 +216,7 @@ log_vars \
 # therefore holds subscriptions back; a full run then publishes functions/ and
 # re-runs the template to create them. Incremental deployments leave existing
 # subscriptions alone on the first pass, so nothing is torn down in between.
-if [[ "$ACTION" == "create" ]]; then
+if [[ "$ACTION" == "create" && "$RG_STATE" != "Succeeded" ]]; then
   SUBSCRIPTIONS_PARAM="deployEventSubscriptions=false"
   info "Event Grid subscriptions are held back until the Function App has code (second pass)."
 else
@@ -228,7 +228,7 @@ fi
 # waiting for instead of looking hung.
 run_deployment "$RG_NAME" "$DEPLOYMENT_NAME" "$ACTION" \
   --location "$LOCATION" \
-  --name "$DEPLOYMENT_NAME" \
+  --name "$DEPLOYMENT_NAME-1" \
   --template-file "$ROOT/infra/main.bicep" \
   --parameters "$ROOT/infra/main.bicepparam" \
   --parameters "$SUBSCRIPTIONS_PARAM"
@@ -287,7 +287,7 @@ PRINCIPAL_IDS="$(printf '%s' "$PRINCIPALS_RAW" | tr '\t' '\n')"
 success "  Found $(printf '%s\n' "$PRINCIPAL_IDS" | grep -c . || true) role assignment(s)."
 
 # The API identity must be among them: the list can be non-empty purely from the
-# local-dev principal (COSMOS_USER_OBJECT_ID), which would pass the check above
+# local-dev principal (DEVELOPER_OBJECT_ID), which would pass the check above
 # while the app itself is still unauthorised. Identity name mirrors identity.bicep.
 if ! API_PRINCIPAL_ID=$(run_hide_stderr az identity show \
   --name "identity-${BASE_NAME}-${ENVIRONMENT}" \
@@ -353,7 +353,7 @@ success "  All data-plane grants are Built-in Data Contributor."
 
 # One round trip for all four outputs (array order is preserved in -o tsv).
 # Outputs can lag the Succeeded state (ARM eventual consistency), so poll.
-DEPLOYMENT_OUTPUTS="$(fetch_deployment_outputs "$DEPLOYMENT_NAME" \
+DEPLOYMENT_OUTPUTS="$(fetch_deployment_outputs "$DEPLOYMENT_NAME-1" \
   "[properties.outputs.registryName.value, properties.outputs.loginServer.value, properties.outputs.appName.value, properties.outputs.fqdn.value]" 4)" || exit 1
 IFS=$'\t' read -r REGISTRY LOGIN_SERVER APP_NAME FQDN <<< "$DEPLOYMENT_OUTPUTS" || true
 
@@ -372,14 +372,14 @@ fi
 # Core Tools ships functions/, then the subscriptions can be created without a
 # failed validation handshake. `databases` mode has no Function App/Event Grid,
 # and `--bicep-only` stopped above, so only the full run gets here.
-if [[ "$DEPLOYMENT_MODE" == "all" ]]; then
+if [[ "$DEPLOYMENT_MODE" == "all" && "$RG_STATE" != "Succeeded" ]]; then
   step "Publishing Function App code..."
   run "$SCRIPT_DIR/publish-functions.sh"
 
   step "Enabling Event Grid subscriptions..."
   run_deployment "$RG_NAME" "$DEPLOYMENT_NAME" create \
     --location "$LOCATION" \
-    --name "$DEPLOYMENT_NAME" \
+    --name "$DEPLOYMENT_NAME-2" \
     --template-file "$ROOT/infra/main.bicep" \
     --parameters "$ROOT/infra/main.bicepparam" \
     --parameters deployEventSubscriptions=true
