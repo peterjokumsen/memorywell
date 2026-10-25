@@ -36,7 +36,7 @@ type GlobalInputs = {
   @description('Cosmos database name.')
   cosmosDatabase: string
   @description('Object id of a developer principal granted Cosmos data-plane access for local tooling. Pass an empty string to skip the grant.')
-  cosmosPrincipalObjectId: string
+  developerPrincipalObjectId: string
 
   @description('Collection of keys used in Key Vault')
   keys: SecretKeys

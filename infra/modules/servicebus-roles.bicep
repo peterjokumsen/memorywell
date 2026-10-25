@@ -7,7 +7,7 @@
 // resource that does not exist, so a typo here deploys "successfully" and then
 // fails with 401 at runtime. Keeping the names as separate fields makes that
 // mistake harder to write.
-param identityPrincipalId string
+param identityPrincipalIds string[]
 param namespaceName string
 param queueName string
 param topicSubscriptions { topic: string, sub: string }[]
@@ -17,17 +17,19 @@ resource queue 'Microsoft.ServiceBus/namespaces/queues@2024-01-01' existing = {
 }
 
 var serviceBusReceiverRoleId = '4f6d3b9b-027b-4f4c-9142-0e5a2a2247e0'
-var roleDefinitionId = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', serviceBusReceiverRoleId)
+var receiverRoleId = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', serviceBusReceiverRoleId)
 
-resource queueReceiver 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  scope: queue
-  name: guid(queue.id, identityPrincipalId, serviceBusReceiverRoleId)
-  properties: {
-    roleDefinitionId: roleDefinitionId
-    principalId: identityPrincipalId
-    principalType: 'ServicePrincipal'
+resource queueReceivers 'Microsoft.Authorization/roleAssignments@2022-04-01' = [
+  for identityPrincipalId in identityPrincipalIds: {
+    scope: queue
+    name: guid(queue.id, identityPrincipalId, serviceBusReceiverRoleId)
+    properties: {
+      roleDefinitionId: receiverRoleId
+      principalId: identityPrincipalId
+      principalType: 'ServicePrincipal'
+    }
   }
-}
+]
 
 resource subscriptions 'Microsoft.ServiceBus/namespaces/topics/subscriptions@2024-01-01' existing = [
   for entry in topicSubscriptions: {
@@ -35,13 +37,20 @@ resource subscriptions 'Microsoft.ServiceBus/namespaces/topics/subscriptions@202
   }
 ]
 
+var nestedArr = [
+  for i in range(0, length(topicSubscriptions)): map(identityPrincipalIds, identityPrincipalId => {
+    index: i
+    subId: subscriptions[i].id
+    identityPrincipalId: identityPrincipalId
+  })
+]
 resource subReceivers 'Microsoft.Authorization/roleAssignments@2022-04-01' = [
-  for i in range(0, length(topicSubscriptions)): {
-    scope: subscriptions[i]
-    name: guid(subscriptions[i].id, identityPrincipalId, serviceBusReceiverRoleId)
+  for s in flatten(nestedArr): {
+    scope: subscriptions[s.index]
+    name: guid(s.subId, s.identityPrincipalId, serviceBusReceiverRoleId)
     properties: {
-      roleDefinitionId: roleDefinitionId
-      principalId: identityPrincipalId
+      roleDefinitionId: receiverRoleId
+      principalId: s.identityPrincipalId
       principalType: 'ServicePrincipal'
     }
   }

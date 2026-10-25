@@ -16,7 +16,7 @@ param postgresClientIp string
 param postgresKeyName string
 param cosmosAccountName string
 param cosmosDatabase string
-param cosmosPrincipalObjectId string
+param developerPrincipalObjectId string
 param redisKeyName string
 // Event Grid webhook subscriptions are only valid once the Function App they
 // point at is answering its validation handshake. provision-env.sh deploys
@@ -40,7 +40,7 @@ var globalInputs GlobalInputs = {
   postgresClientIp: !empty(postgresClientIp) && length(postgresClientIp) > 8
     ? postgresClientIp
     : fail('postgresClientIp is not set or has length less than 8')
-  cosmosPrincipalObjectId: cosmosPrincipalObjectId
+  developerPrincipalObjectId: environment != 'dev' ? '' : developerPrincipalObjectId
   keys: {
     postgres: !empty(postgresKeyName) ? postgresKeyName : fail('postgresSecretKey is not set')
     redis: !empty(redisKeyName) ? redisKeyName : fail('redisSecretKey is not set')
@@ -124,7 +124,7 @@ module platform './modules/platform.bicep' = {
     acrLoginServer: acr.properties.loginServer
     identityId: identity.outputs.id
     identityClientId: identity.outputs.clientId
-    identityPrincipalId: identity.outputs.principalId
+    identityPrincipalIds: filter([identity.outputs.principalId, inputs.global.developerPrincipalObjectId], p => p != '')
     deployEventSubscriptions: deployEventSubscriptions
     postgresAdministrationPassword: postgresAdministratorPassword
   }

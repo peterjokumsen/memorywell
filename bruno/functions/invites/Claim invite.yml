@@ -1,0 +1,20 @@
+info:
+  name: Claim invite
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: "{{fns_url}}/api/invites/claim?token=abc"
+  params:
+    - name: token
+      value: abc
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

@@ -77,7 +77,7 @@ if [[ ! -f "$EXAMPLE" ]]; then
   exit 1
 fi
 
-for key in BASE_NAME ENVIRONMENT LOCATION SUBSCRIPTION_ID POSTGRES_ADMIN_PASSWORD COSMOS_USER_OBJECT_ID; do
+for key in BASE_NAME ENVIRONMENT LOCATION SUBSCRIPTION_ID POSTGRES_ADMIN_PASSWORD DEVELOPER_OBJECT_ID; do
   if ! grep -q "^${key}=" "$EXAMPLE"; then
     error "$EXAMPLE is missing ${key}=; update the template first."
     exit 1
@@ -138,11 +138,11 @@ success "  Generated 32-character password (not shown)."
 step "Resolving signed-in user for Cosmos data-plane access..."
 # A service principal has no signed-in user; the grant is optional, so an
 # empty value is valid and main.bicepparam treats it as "skip".
-if COSMOS_USER_OBJECT_ID="$(az ad signed-in-user show --query id -o tsv 2>/dev/null)" && [[ -n "$COSMOS_USER_OBJECT_ID" ]]; then
-  success "  Cosmos principal: $COSMOS_USER_OBJECT_ID"
+if DEVELOPER_OBJECT_ID="$(az ad signed-in-user show --query id -o tsv 2>/dev/null)" && [[ -n "$DEVELOPER_OBJECT_ID" ]]; then
+  success "  Cosmos principal: $DEVELOPER_OBJECT_ID"
 else
-  COSMOS_USER_OBJECT_ID=""
-  warn "  No signed-in user (service principal?); COSMOS_USER_OBJECT_ID left empty."
+  DEVELOPER_OBJECT_ID=""
+  warn "  No signed-in user (service principal?); DEVELOPER_OBJECT_ID left empty."
 fi
 
 step "Writing ${TARGET#"$ROOT"/}..."
@@ -162,7 +162,7 @@ while IFS= read -r line || [[ -n "$line" ]]; do
     LOCATION=*) printf 'LOCATION=%s\n' "$LOCATION" ;;
     SUBSCRIPTION_ID=*) printf 'SUBSCRIPTION_ID=%s\n' "$SUBSCRIPTION_ID" ;;
     POSTGRES_ADMIN_PASSWORD=*) printf 'POSTGRES_ADMIN_PASSWORD=%s\n' "$POSTGRES_ADMIN_PASSWORD" ;;
-    COSMOS_USER_OBJECT_ID=*) printf 'COSMOS_USER_OBJECT_ID=%s\n' "$COSMOS_USER_OBJECT_ID" ;;
+    DEVELOPER_OBJECT_ID=*) printf 'DEVELOPER_OBJECT_ID=%s\n' "$DEVELOPER_OBJECT_ID" ;;
     *) printf '%s\n' "$line" ;;
   esac
 done < "$EXAMPLE" > "$tmp"
@@ -179,5 +179,5 @@ info "  ENVIRONMENT=$ENVIRONMENT"
 info "  LOCATION=$LOCATION"
 info "  SUBSCRIPTION_ID=$SUBSCRIPTION_ID"
 info "  POSTGRES_ADMIN_PASSWORD=<generated>"
-info "  COSMOS_USER_OBJECT_ID=${COSMOS_USER_OBJECT_ID:-<empty>}"
+info "  DEVELOPER_OBJECT_ID=${DEVELOPER_OBJECT_ID:-<empty>}"
 info "Next: ./scripts/provision-all.sh"

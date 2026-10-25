@@ -1,7 +1,7 @@
 import { ResourceGroupInputs, ServiceBusTopics } from './_types.bicep'
 
 param inputs ResourceGroupInputs
-param identityPrincipalId string
+param identityPrincipalIds string[]
 
 resource ns 'Microsoft.ServiceBus/namespaces@2024-01-01' = {
   name: 'sb-${inputs.global.baseName}-${inputs.global.environment}'
@@ -58,7 +58,7 @@ module subs 'servicebus-subs.bicep' = [
 module receiverRoles 'servicebus-roles.bicep' = {
   name: '${deployment().name}-roles'
   params: {
-    identityPrincipalId: identityPrincipalId
+    identityPrincipalIds: identityPrincipalIds
     namespaceName: ns.name
     queueName: queue.name
     topicSubscriptions: [
