@@ -57,7 +57,8 @@ module cosmos 'cosmos.bicep' = if (!containerOnly) {
   }
 }
 
-module redis 'redis.bicep' = if (!containerOnly) {
+var includeRedis = !containerOnly && inputs.global.mode != 'skip-redis'
+module redis 'redis.bicep' = if (includeRedis) {
   name: '${deployment().name}-redis'
   params: {
     inputs: inputs
@@ -65,7 +66,7 @@ module redis 'redis.bicep' = if (!containerOnly) {
 }
 
 var redisConnKey = inputs.global.keys.redis
-module redisConnectionString 'secret.bicep' = if (!containerOnly) {
+module redisConnectionString 'secret.bicep' = if (includeRedis) {
   name: '${deployment().name}-redis-conn'
   params: {
     inputs: inputs
