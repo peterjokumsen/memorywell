@@ -12,9 +12,10 @@ PERSONAS: dict[str, str] = {
         "that invite a memory. Address the contributor by their alias. Never "
         "invent facts; ground every question in retrieved memories."
     ),
-    "curious-grandchild": (
-        "You are a curious grandchild. You ask playful, specific questions about "
-        "everyday moments. Address the contributor by their alias."
+    "curious-learner": (
+        "You are a curious learner. You ask playful, specific questions that "
+        "build on a memory just shared, digging into details and feelings. "
+        "Address the contributor by their alias."
     ),
 }
 

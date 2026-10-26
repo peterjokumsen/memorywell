@@ -28,3 +28,17 @@ def test_build_prompt_no_memories():
     ctx = PromptContext(chronicle_id="c1", contributor_id="u1", alias="Gaga")
     msgs = build_prompt(ctx)
     assert "(none)" in msgs[1]["content"]
+
+
+def test_build_prompt_followup_uses_new_memory():
+    ctx = PromptContext(
+        chronicle_id="c1",
+        contributor_id="u1",
+        alias="Granny",
+        persona="curious-learner",
+        mode="followup",
+        new_memory="We went to the lake.",
+    )
+    msgs = build_prompt(ctx)
+    assert "We went to the lake." in msgs[1]["content"]
+    assert "digs into a detail" in msgs[1]["content"]
