@@ -116,3 +116,30 @@ def refresh_embedding(memory: CuratedMemory, *, embedder=None) -> CuratedMemory:
     """Populate ``memory.embedding`` in place and return it."""
     memory.embedding = generate_embedding(memory.text, embedder=embedder)
     return memory
+
+
+_STORE: dict[str, CuratedMemory] = {}
+
+
+def record_memory(
+    chronicle_id: str,
+    contributor_id: str,
+    text: str,
+    alias: str,
+    *,
+    llm=None,
+    embedder=None,
+    store=None,
+) -> CuratedMemory:
+    if store is None:
+        store = _STORE
+    extracted = extract_metadata(text, llm=llm)
+    memory = to_curated_memory(chronicle_id, contributor_id, text, alias, extracted)
+    refresh_embedding(memory, embedder=embedder)
+    return write_memory(memory, store=store)
+
+
+def list_memories(chronicle_id: str, *, store=None) -> list[CuratedMemory]:
+    if store is None:
+        store = _STORE
+    return [m for m in store.values() if m.chronicle_id == chronicle_id]
