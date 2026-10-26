@@ -7,7 +7,7 @@ import os
 from dataclasses import dataclass
 from typing import Any
 
-import httpx
+from openai import AzureOpenAI
 
 
 @dataclass
@@ -51,19 +51,17 @@ def extract_metadata(text: str, *, llm=None) -> dict[str, Any]:
     deployment = os.getenv("AZURE_OPENAI_DEPLOYMENT", "gpt-4o-mini")
     if not endpoint or not key:
         raise RuntimeError("Azure OpenAI not configured")
-    url = (
-        f"{endpoint.rstrip('/')}/openai/deployments/{deployment}"
-        "/chat/completions?api-version=2024-08-01-preview"
+    client = AzureOpenAI(
+        azure_endpoint=endpoint,
+        api_key=key,
+        api_version="2024-08-01-preview",
     )
-    resp = httpx.post(
-        url,
-        headers={"api-key": key},
-        json={"messages": messages, "response_format": {"type": "json_object"}},
-        timeout=30.0,
+    resp = client.chat.completions.create(
+        model=deployment,
+        messages=messages,
+        response_format={"type": "json_object"},
     )
-    resp.raise_for_status()
-    data = resp.json()
-    content = data["choices"][0]["message"]["content"]
+    content = resp.choices[0].message.content
     return json.loads(content)
 
 
