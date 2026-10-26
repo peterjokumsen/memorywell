@@ -8,6 +8,10 @@ steps) calls Azure OpenAI to generate a question.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import UTC, datetime, timedelta
+from typing import Any
+
+from dateutil.relativedelta import relativedelta
 
 from persona import get_persona
 
@@ -50,3 +54,43 @@ def build_prompt(ctx: PromptContext) -> list[dict[str, str]]:
         {"role": "system", "content": system},
         {"role": "user", "content": user},
     ]
+
+
+def get_alias(contributor: Any, chronicle_id: str) -> str:
+    """Return the contributor's per-chronicle display alias."""
+    aliases = getattr(contributor, "displayAlias", None)
+    if aliases is None and isinstance(contributor, dict):
+        aliases = contributor.get("displayAlias", {})
+    aliases = aliases or {}
+    if isinstance(aliases, dict):
+        if chronicle_id in aliases:
+            return str(aliases[chronicle_id])
+        if aliases:
+            return str(next(iter(aliases.values())))
+    return str(contributor) if not isinstance(contributor, dict) else "Contributor"
+
+
+def snapshot_alias(alias: str) -> str:
+    """Return the alias to freeze as ``aliasAtWriteTime`` on a new memory."""
+    return alias
+
+
+def is_due(
+    cadence: str,
+    last_at: datetime | None,
+    now: datetime | None = None,
+) -> bool:
+    """Whether a prompt is due for the given cadence and last activity."""
+    if now is None:
+        now = datetime.now(UTC)
+    if cadence in ("none", "special-occasions"):
+        return False
+    if last_at is None:
+        return True
+    if last_at.tzinfo is None:
+        last_at = last_at.replace(tzinfo=UTC)
+    if cadence == "weekly":
+        return now >= last_at + timedelta(days=7)
+    if cadence == "monthly":
+        return now >= last_at + relativedelta(months=1)
+    return False
