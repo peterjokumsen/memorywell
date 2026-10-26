@@ -1,0 +1,25 @@
+info:
+  name: Generate Prompt
+  type: http
+  seq: 3
+
+http:
+  method: POST
+  url: "{{api_url}}/prompts"
+  body:
+    type: json
+    data: |-
+      {
+        "chronicle_id": "c1",
+        "contributor_id": "u1",
+        "alias": "Gaga",
+        "memories": ["m1"]
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false
