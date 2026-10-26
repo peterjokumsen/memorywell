@@ -21,6 +21,7 @@ class CuratedMemory:
     alias_at_write_time: str = ""
     alias_change_requested: bool = False
     requested_alias: str | None = None
+    embedding: list[float] | None = None
 
 
 EXTRACTION_SYSTEM = (
@@ -100,4 +101,18 @@ def write_memory(memory: CuratedMemory, *, store=None) -> CuratedMemory:
     if key in store:
         return store[key]
     store[key] = memory
+    return memory
+
+
+def generate_embedding(text: str, *, embedder=None) -> list[float]:
+    """Generate an embedding vector for text. Injectable for tests."""
+    if embedder is not None:
+        return list(embedder(text))
+    # Production wiring lands with the change-feed function; return empty stub.
+    return []
+
+
+def refresh_embedding(memory: CuratedMemory, *, embedder=None) -> CuratedMemory:
+    """Populate ``memory.embedding`` in place and return it."""
+    memory.embedding = generate_embedding(memory.text, embedder=embedder)
     return memory
