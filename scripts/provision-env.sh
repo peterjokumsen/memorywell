@@ -21,18 +21,18 @@ while [[ $# -gt 0 ]]; do
     --deployment-mode)
       DEPLOYMENT_MODE="${2:-}"
       case "$DEPLOYMENT_MODE" in
-        "all" | "container-apps" | "databases")
+        "all" | "container-apps" | "databases" | "skip-redis")
           shift 2
           ;;
         *)
           error "Unknown --deployment-mode: $1"
-          echo "Expected: [all|container-apps|databases]"
+          echo "Expected: [all|container-apps|databases|skip-redis]"
           exit 1
           ;;
       esac
       ;;
     -h|--help)
-      echo "Usage: $0 [--action create|what-if] [--bicep-only] [--deployment-mode all|container-apps|databases]"
+      echo "Usage: $0 [--action create|what-if] [--bicep-only] [--deployment-mode all|container-apps|databases|skip-redis]"
       echo "  --action ACTION      Deployment action: create (default) or what-if"
       echo "  --bicep-only         Stop after Bicep deployment; skip container image build/push and app update"
       echo "  --deployment-mode    Deploy all environment variables or only container-apps/databases"

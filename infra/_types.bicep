@@ -2,7 +2,7 @@
 type EnvironmentType = 'dev' | 'test' | 'prod'
 
 @export()
-type DeploymentMode = 'all' | 'container-apps' | 'databases'
+type DeploymentMode = 'all' | 'container-apps' | 'databases' | 'skip-redis'
 
 @export()
 type SecretKeys = {
