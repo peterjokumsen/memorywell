@@ -83,3 +83,21 @@ def to_curated_memory(
         alias_change_requested=bool(extracted.get("aliasChangeRequested", False)),
         requested_alias=extracted.get("requestedAlias"),
     )
+
+
+def memory_key(m: CuratedMemory) -> str:
+    return f"{m.chronicle_id}|{m.contributor_id}|{m.text}"
+
+
+def write_memory(memory: CuratedMemory, *, store=None) -> CuratedMemory:
+    """Idempotently write a curated memory to the canonical store.
+
+    Returns the stored memory (the existing one if a duplicate key exists).
+    """
+    if store is None:
+        store = {}
+    key = memory_key(memory)
+    if key in store:
+        return store[key]
+    store[key] = memory
+    return memory
