@@ -1,7 +1,14 @@
 from datetime import UTC, datetime, timedelta
 
 from persona import PERSONAS, get_persona
-from prompter import PromptContext, build_prompt, get_alias, is_due, snapshot_alias
+from prompter import (
+    PromptContext,
+    build_prompt,
+    generate_question,
+    get_alias,
+    is_due,
+    snapshot_alias,
+)
 
 
 def test_get_persona_default():
@@ -75,3 +82,9 @@ def test_is_due_monthly_calendar():
     assert is_due("monthly", last, now) is True
     last2 = datetime(2026, 2, 20, tzinfo=UTC)
     assert is_due("monthly", last2, now) is False
+
+
+def test_generate_question_with_llm():
+    ctx = PromptContext(chronicle_id="c1", contributor_id="u1", alias="Gaga", memories=["m"])
+    q = generate_question(ctx, llm=lambda msgs: "How are you?")
+    assert q == "How are you?"

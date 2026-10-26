@@ -7,10 +7,12 @@ steps) calls Azure OpenAI to generate a question.
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
+import httpx
 from dateutil.relativedelta import relativedelta
 
 from persona import get_persona
@@ -94,3 +96,23 @@ def is_due(
     if cadence == "monthly":
         return now >= last_at + relativedelta(months=1)
     return False
+
+
+def generate_question(ctx: PromptContext, *, llm=None) -> str:
+    """Generate a single-shot question for the given context."""
+    messages = build_prompt(ctx)
+    if llm is not None:
+        return str(llm(messages))
+    endpoint = os.getenv("AZURE_OPENAI_ENDPOINT")
+    key = os.getenv("AZURE_OPENAI_API_KEY")
+    deployment = os.getenv("AZURE_OPENAI_DEPLOYMENT", "gpt-4o-mini")
+    if not endpoint or not key:
+        raise RuntimeError("Azure OpenAI not configured")
+    url = (
+        f"{endpoint.rstrip('/')}/openai/deployments/{deployment}"
+        "/chat/completions?api-version=2024-08-01-preview"
+    )
+    resp = httpx.post(url, headers={"api-key": key}, json={"messages": messages}, timeout=30.0)
+    resp.raise_for_status()
+    data = resp.json()
+    return data["choices"][0]["message"]["content"]

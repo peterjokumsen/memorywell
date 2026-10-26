@@ -52,7 +52,7 @@ done
 
 if [[ "$ACTION" != "create" && "$ACTION" != "what-if" ]]; then
   error "$ACTION is not a valid action"
-  echo "Usage: $0 [--action create|what-if] [--bicep-only]" >&2
+  echo "Usage: $0 [--action creaate|what-if] [--bicep-only]" >&2
   exit 1
 fi
 
