@@ -1,0 +1,43 @@
+:root {
+  --color-bg: #f4f3ee;
+  --color-surface: #ffffff;
+  --color-surface-variant: #ebe8df;
+  --color-primary: #4a6048;
+  --color-text: #1c201d;
+  --color-text-muted: #666e65;
+  --color-border: #dcd8cd;
+  --color-milestone: #b86b43;
+  --radius-card: 16px;
+  --radius-pill: 20px;
+  --radius-input: 24px;
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 12px;
+  --space-lg: 16px;
+  --space-xl: 24px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-bg: #121413;
+    --color-surface: #1c1f1d;
+    --color-surface-variant: #262a27;
+    --color-primary: #7ca17a;
+    --color-text: #eaece8;
+    --color-text-muted: #9ca39b;
+    --color-border: #2e332f;
+    --color-milestone: #d18057;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: -apple-system, "SF Pro Text", system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 20px;
+}

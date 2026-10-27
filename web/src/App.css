@@ -1,0 +1,35 @@
+.app-shell {
+  max-width: 430px;
+  margin: 0 auto;
+  padding: var(--space-lg);
+}
+
+.card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  padding: var(--space-lg);
+  margin-bottom: var(--space-md);
+}
+
+.pill {
+  background: var(--color-surface-variant);
+  border-radius: var(--radius-pill);
+  padding: var(--space-xs) var(--space-md);
+  border: none;
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.input-capsule {
+  border-radius: var(--radius-input);
+  border: 1px solid var(--color-border);
+  padding: var(--space-sm) var(--space-lg);
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+h1,
+h2 {
+  color: var(--color-primary);
+}
