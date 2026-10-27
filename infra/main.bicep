@@ -145,7 +145,7 @@ module webApp './modules/appservice.bicep' = {
   name: '${deployment().name}-webapp'
   scope: rg
   params: {
-    name: '${inputs.global.baseName}-web'
+    name: 'web-${inputs.global.baseName}'
     location: inputs.global.location
   }
 }

@@ -3,7 +3,7 @@ param location string
 param sku string = 'B1'
 
 resource plan 'Microsoft.Web/serverfarms@2023-12-01' = {
-  name: '${name}-plan'
+  name: 'plan-${name}'
   location: location
   sku: {
     name: sku
@@ -21,7 +21,7 @@ resource app 'Microsoft.Web/sites@2023-12-01' = {
     serverFarmId: plan.id
     httpsOnly: true
     siteConfig: {
-      linuxFxVersion: 'NODE|20-lts'
+      linuxFxVersion: 'NODE|24-lts'
     }
   }
 }
