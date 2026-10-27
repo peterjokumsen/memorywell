@@ -104,3 +104,23 @@ def emit_memory_flagged(flag: GuardianFlag) -> dict[str, Any]:
         "score": flag.score,
         "status": flag.status,
     }
+
+
+def validate_alias(
+    requested: str, existing: set[str], own_current: str | None = None
+) -> tuple[bool, str]:
+    """Return (ok, reason)."""
+    if not requested or not requested.strip():
+        return False, "empty"
+    if requested in existing and requested != own_current:
+        return False, "not-unique"
+    # appropriateness: basic length check
+    if len(requested) > 40:
+        return False, "too-long"
+    if requested != own_current and requested in existing:
+        return False, "conflict"
+    return True, "ok"
+
+
+def apply_alias(contributor_id: str, new_alias: str) -> dict[str, Any]:
+    return {"contributor_id": contributor_id, "display_alias": new_alias, "event": "alias.updated"}
