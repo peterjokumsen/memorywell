@@ -180,3 +180,19 @@
     border-right-color: var(--border);
   }
 }
+
+main {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 1rem;
+  font-family: system-ui, sans-serif;
+}
+
+section,
+div {
+  margin-bottom: 1rem;
+}
+
+button {
+  margin-left: 0.5rem;
+}
