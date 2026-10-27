@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 from dataclasses import dataclass
+from typing import Any
 
 from openai import AzureOpenAI
 
@@ -79,3 +80,27 @@ def score_memory(text: str, *, llm=None) -> GuardianScore:
         duplicate=float(data.get("duplicate", 0.0)),
         reasons=list(data.get("reasons", []) or []),
     )
+
+
+@dataclass
+class GuardianFlag:
+    memory_id: str
+    reason: str
+    score: float
+    status: str = "open"
+
+
+def build_flag(memory_id: str, score: GuardianScore) -> GuardianFlag:
+    reason = ",".join(score.reasons) if score.reasons else "threshold"
+    top = max(score.safety, score.sensitivity, score.duplicate, 1.0 - score.quality)
+    return GuardianFlag(memory_id=memory_id, reason=reason, score=top)
+
+
+def emit_memory_flagged(flag: GuardianFlag) -> dict[str, Any]:
+    return {
+        "event": "memory.flagged",
+        "memory_id": flag.memory_id,
+        "reason": flag.reason,
+        "score": flag.score,
+        "status": flag.status,
+    }
