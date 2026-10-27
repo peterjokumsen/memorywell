@@ -1,4 +1,5 @@
 import { AliasCadence } from "./components/AliasCadence";
+import { Capture } from "./components/Capture";
 import { Chat } from "./components/Chat";
 import { InviteClaim } from "./components/InviteClaim";
 import "./App.css";
@@ -10,6 +11,7 @@ function App() {
       <InviteClaim />
       <AliasCadence />
       <Chat />
+      <Capture />
     </main>
   );
 }
