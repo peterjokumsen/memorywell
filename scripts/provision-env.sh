@@ -354,14 +354,15 @@ success "  All data-plane grants are Built-in Data Contributor."
 # One round trip for all four outputs (array order is preserved in -o tsv).
 # Outputs can lag the Succeeded state (ARM eventual consistency), so poll.
 DEPLOYMENT_OUTPUTS="$(fetch_deployment_outputs "$DEPLOYMENT_NAME-1" \
-  "[properties.outputs.registryName.value, properties.outputs.loginServer.value, properties.outputs.appName.value, properties.outputs.fqdn.value]" 4)" || exit 1
-IFS=$'\t' read -r REGISTRY LOGIN_SERVER APP_NAME FQDN <<< "$DEPLOYMENT_OUTPUTS" || true
+  "[properties.outputs.registryName.value, properties.outputs.loginServer.value, properties.outputs.appName.value, properties.outputs.fqdn.value, properties.outputs.webAppUrl.value]" 5)" || exit 1
+IFS=$'\t' read -r REGISTRY LOGIN_SERVER APP_NAME FQDN WEB_APP_URL <<< "$DEPLOYMENT_OUTPUTS" || true
 
 log_vars \
   "REGISTRY=$REGISTRY" \
   "LOGIN_SERVER=$LOGIN_SERVER" \
   "APP_NAME=$APP_NAME" \
-  "FQDN=$FQDN"
+  "FQDN=$FQDN" \
+  "WEB_APP_URL=$WEB_APP_URL"
 
 if [[ "$(login_server)" != "$LOGIN_SERVER" ]]; then
   error "Login server mismatch"
