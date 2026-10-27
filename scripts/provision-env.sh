@@ -226,7 +226,7 @@ fi
 # run_deployment, not `run`: this call is silent for minutes at a time (ARM
 # returns nothing until the deployment finishes), so it reports what it is
 # waiting for instead of looking hung.
-run_deployment "$RG_NAME" "$DEPLOYMENT_NAME" "$ACTION" \
+run_deployment "$RG_NAME" "$DEPLOYMENT_NAME-1" "$ACTION" \
   --location "$LOCATION" \
   --name "$DEPLOYMENT_NAME-1" \
   --template-file "$ROOT/infra/main.bicep" \
@@ -377,7 +377,7 @@ if [[ "$DEPLOYMENT_MODE" == "all" && "$RG_STATE" != "Succeeded" ]]; then
   run "$SCRIPT_DIR/publish-functions.sh"
 
   step "Enabling Event Grid subscriptions..."
-  run_deployment "$RG_NAME" "$DEPLOYMENT_NAME" create \
+  run_deployment "$RG_NAME" "$DEPLOYMENT_NAME-2" create \
     --location "$LOCATION" \
     --name "$DEPLOYMENT_NAME-2" \
     --template-file "$ROOT/infra/main.bicep" \
