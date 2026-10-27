@@ -33,6 +33,7 @@ prepared for productization; local dev uses a dev identity header.
 8. Web testing improvements (per-component tests, API client tests).
 9. Easy Auth wiring (placeholder provider).
 10. UI/UX polish (responsive layout, theming, accessibility).
+11. App Service Bicep module + deploy wiring (Easy Auth).
 
 ## File outline
 
