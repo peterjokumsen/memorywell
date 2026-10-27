@@ -2,6 +2,7 @@ import { AliasCadence } from "./components/AliasCadence";
 import { Capture } from "./components/Capture";
 import { Chat } from "./components/Chat";
 import { InviteClaim } from "./components/InviteClaim";
+import { ReviewQueue } from "./components/ReviewQueue";
 import { Timeline } from "./components/Timeline";
 import "./App.css";
 
@@ -14,6 +15,7 @@ function App() {
       <Chat />
       <Capture />
       <Timeline />
+      <ReviewQueue />
     </main>
   );
 }
