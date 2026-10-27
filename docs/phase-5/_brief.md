@@ -30,7 +30,10 @@ prepared for productization; local dev uses a dev identity header.
 5. Chat UI + Drop Zone (text/photo/voice capture).
 6. Timeline with Contributor Threads + Milestone Chapters.
 7. Owner review queue.
-8. App Service Bicep module + deploy wiring (Easy Auth).
+8. Web testing improvements (per-component tests, API client tests).
+9. Easy Auth wiring (placeholder provider).
+10. UI/UX polish (responsive layout, theming, accessibility).
+11. App Service Bicep module + deploy wiring (Easy Auth).
 
 ## File outline
 

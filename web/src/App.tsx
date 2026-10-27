@@ -8,8 +8,8 @@ import "./App.css";
 
 function App() {
   return (
-    <main>
-      <h1>Memorywell</h1>
+    <main className="app-shell">
+      <h1 style={{ fontFamily: "Georgia, serif", fontSize: "22px" }}>Circle of Care</h1>
       <InviteClaim />
       <AliasCadence />
       <Chat />
