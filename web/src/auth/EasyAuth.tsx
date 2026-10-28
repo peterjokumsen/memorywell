@@ -1,8 +1,4 @@
-import { createContext, useContext } from "react";
-
-type Principal = { userId: string; userDetails: string } | null;
-
-const Ctx = createContext<Principal>(null);
+import { Ctx } from "./useEasyAuth";
 
 export function EasyAuthProvider({ children }: { children: React.ReactNode }) {
   // In production App Service injects x-ms-client-principal; read via header not available in browser.
@@ -10,6 +6,4 @@ export function EasyAuthProvider({ children }: { children: React.ReactNode }) {
   return <Ctx.Provider value={null}>{children}</Ctx.Provider>;
 }
 
-export function useEasyAuth() {
-  return useContext(Ctx);
-}
+export { useEasyAuth } from "./useEasyAuth";
