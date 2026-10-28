@@ -7,6 +7,7 @@ param acrLoginServer string
 param monitorCustomerId string
 param monitorWorkspaceId string
 param monitorApiVersion string
+param appInsightsConnectionString string = ''
 param env {
   cosmosDatabase: string
   cosmosEndpoint: string
@@ -48,6 +49,7 @@ var secrets = inputs.global.mode == 'container-apps'
 var environmentVariables = inputs.global.mode == 'container-apps'
   ? []
   : [
+      { name: 'APPLICATIONINSIGHTS_CONNECTION_STRING', value: appInsightsConnectionString }
       { name: 'COSMOS_ENDPOINT', value: env.cosmosEndpoint }
       { name: 'COSMOS_DATABASE', value: env.cosmosDatabase }
       {

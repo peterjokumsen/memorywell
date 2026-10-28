@@ -12,6 +12,7 @@ param serviceBusNamespace string
 param identityClientId string
 param identityId string
 param cosmosAccountEndpoint string = ''
+param appInsightsConnectionString string = ''
 
 var planName = 'plan-${inputs.global.baseName}-${inputs.global.environment}'
 var appName = 'func-${inputs.global.baseName}-${inputs.global.environment}'
@@ -28,6 +29,10 @@ var baseAppSettings = [
   { name: 'ServiceBusConnection__credential', value: 'managedidentity' }
   { name: 'ServiceBusConnection__clientId', value: identityClientId }
 ]
+
+var appInsightsAppSettings = empty(appInsightsConnectionString)
+  ? []
+  : [{ name: 'APPLICATIONINSIGHTS_CONNECTION_STRING', value: appInsightsConnectionString }]
 
 var cosmosAppSettings = empty(cosmosAccountEndpoint)
   ? []
@@ -106,7 +111,7 @@ resource app 'Microsoft.Web/sites@2023-12-01' = {
     httpsOnly: true
     siteConfig: {
       minTlsVersion: '1.2'
-      appSettings: concat(baseAppSettings, cosmosAppSettings)
+      appSettings: concat(baseAppSettings, appInsightsAppSettings, cosmosAppSettings)
     }
     functionAppConfig: {
       runtime: {
