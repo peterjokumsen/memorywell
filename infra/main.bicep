@@ -141,7 +141,7 @@ output appName string = platform.outputs.appName
 output fqdn string = platform.outputs.fqdn
 output functionAppName string = platform.outputs.functionAppName
 output functionAppFqdn string = platform.outputs.functionAppFqdn
-module webApp './modules/appservice.bicep' = {
+module webApp './modules/swa.bicep' = {
   name: '${deployment().name}-webapp'
   scope: rg
   params: {
