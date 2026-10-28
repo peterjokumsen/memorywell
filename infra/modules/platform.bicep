@@ -29,6 +29,14 @@ module monitoring 'monitor.bicep' = {
   }
 }
 
+module appInsights 'appinsights.bicep' = {
+  name: '${deployment().name}-appinsights'
+  params: {
+    inputs: inputs
+    workspaceId: monitoring.outputs.workspaceId
+  }
+}
+
 module managedEnvironment 'managed-environment.bicep' = {
   name: '${deployment().name}-managed-environment'
   params: {
@@ -105,6 +113,7 @@ module containerApp 'containerapp.bicep' = if (!databaseOnly) {
     monitorCustomerId: monitoring.outputs.customerId
     monitorWorkspaceId: monitoring.outputs.workspaceId
     monitorApiVersion: monitoring.outputs.apiVersion
+    appInsightsConnectionString: appInsights.outputs.connectionString
     managedEnvironmentId: managedEnvironment.outputs.id
     env: {
       cosmosDatabase: cosmos.?outputs.databaseName ?? nullDefault
@@ -136,6 +145,7 @@ module functions 'functions.bicep' = if (!databaseOnly) {
     cosmosAccountEndpoint: cosmos.?outputs.accountEndpoint ?? ''
     identityClientId: identityClientId
     identityId: identityId
+    appInsightsConnectionString: appInsights.outputs.connectionString
   }
 }
 

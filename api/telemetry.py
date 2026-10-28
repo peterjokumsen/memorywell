@@ -28,6 +28,18 @@ def configure_telemetry(app: FastAPI) -> None:
     service_name = os.getenv("OTEL_SERVICE_NAME", "memorywell-api")
     provider = TracerProvider(resource=Resource.create({"service.name": service_name}))
 
+    conn_str = os.getenv("APPLICATIONINSIGHTS_CONNECTION_STRING")
+    if conn_str:
+        try:
+            from azure.monitor.opentelemetry import configure_azure_monitor
+
+            configure_azure_monitor(connection_string=conn_str)
+            FastAPIInstrumentor.instrument_app(app)
+            app.state.tracer = trace.get_tracer(service_name)
+            return
+        except ImportError:  # pragma: no cover
+            pass
+
     endpoint = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
     if endpoint:
         try:
