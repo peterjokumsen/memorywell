@@ -1,17 +1,20 @@
-# Phase 8 Brief — Frontend polish
+# Phase 8 Brief — Productization
 
 > Status: in progress.
 
 ## Goal
 
-Improve web application to match design documentation.
+Multi-household invites, milestone grouping polish, digest generation, JSON export / physical-book stub.
 
 ## Ordered steps
 
-1. Audit current UI vs design docs.
-2. Implement responsive layout/theming/accessibility.
-3. Validate.
+1. Multi-household invites.
+2. Milestone grouping polish.
+3. Digest generation.
+4. JSON export / physical-book stub.
 
 ## Review gate
 
-- UI matches design docs.
+- Invite flow works across households
+- Digest generated
+- Export available
