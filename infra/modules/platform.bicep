@@ -37,6 +37,14 @@ module appInsights 'appinsights.bicep' = {
   }
 }
 
+module workbook 'workbook.bicep' = if (!databaseOnly) {
+  name: '${deployment().name}-workbook'
+  params: {
+    inputs: inputs
+    appInsightsId: appInsights.outputs.id
+  }
+}
+
 module managedEnvironment 'managed-environment.bicep' = {
   name: '${deployment().name}-managed-environment'
   params: {
@@ -130,6 +138,14 @@ module serviceBus 'servicebus.bicep' = if (!databaseOnly) {
   params: {
     inputs: inputs
     identityPrincipalIds: identityPrincipalIds
+  }
+}
+
+module dlqAlert 'dlqalert.bicep' = if (!databaseOnly) {
+  name: '${deployment().name}-dlqalert'
+  params: {
+    inputs: inputs
+    serviceBusNamespace: serviceBus!.outputs.namespaceName
   }
 }
 
