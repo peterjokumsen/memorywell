@@ -152,3 +152,12 @@ module webApp './modules/swa.bicep' = {
 
 output functionLogUrl string = platform.outputs.functionLogUrl
 output webAppUrl string = webApp.outputs.appUrl
+
+module budget './modules/budget.bicep' = {
+  name: '${deployment().name}-budget'
+  scope: rg
+  params: {
+    name: 'budget-${inputs.global.baseName}-${inputs.global.environment}'
+    amount: 50
+  }
+}
