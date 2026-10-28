@@ -19,6 +19,3 @@ cd dist
 zip -r /tmp/web.zip . >/dev/null
 az webapp deploy --resource-group "$RG" --name "$APP" --src-path /tmp/web.zip --type zip
 echo "Published web to $APP"
-EOF
-chmod +x scripts/publish-web.sh
-bash -n scripts/publish-web.sh && echo ok
