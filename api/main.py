@@ -3,8 +3,10 @@ from pydantic import BaseModel
 
 from curator import list_memories, record_memory
 from prompter import PromptContext, generate_question
+from telemetry import configure_telemetry
 
 app = FastAPI()
+configure_telemetry(app)
 
 
 class PromptRequest(BaseModel):
