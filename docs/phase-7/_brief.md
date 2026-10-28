@@ -18,10 +18,11 @@ alert wired into the existing monitoring resources.
 ## Ordered steps
 
 1. OpenTelemetry instrumentation in API (`api/`) — request + dependency traces, custom spans.
-2. OpenTelemetry instrumentation in Functions (`functions/`) — triggers + dependency traces.
-3. KQL workbook Bicep module (incl. flag rate) + deploy wiring.
-4. DLQ alert Bicep module + deploy wiring.
-5. Tests / validation (logging gate, bicep build).
+2. Application Insights Bicep module + connection string injected into API container app (and Functions).
+3. OpenTelemetry instrumentation in Functions (`functions/`) — triggers + dependency traces.
+4. KQL workbook Bicep module (incl. flag rate) + deploy wiring.
+5. DLQ alert Bicep module + deploy wiring.
+6. Tests / validation (logging gate, bicep build).
 
 ## Review gate
 
