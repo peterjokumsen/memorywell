@@ -5,15 +5,40 @@ export function AliasCadence() {
   const [cadence, setCadence] = useState("monthly");
 
   return (
-    <div>
-      <h2>Contributor settings</h2>
-      <label>
+    <div className="card" style={{ gap: "12px" }}>
+      <h2 className="section-heading">Contributor settings</h2>
+      <label
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: "4px",
+          fontSize: "13px",
+          fontWeight: 600,
+        }}
+      >
         Display alias
-        <input value={alias} onChange={(e) => setAlias(e.target.value)} />
+        <input
+          className="input-capsule"
+          value={alias}
+          onChange={(e) => setAlias(e.target.value)}
+          placeholder="e.g. Gaga"
+        />
       </label>
-      <label>
+      <label
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: "4px",
+          fontSize: "13px",
+          fontWeight: 600,
+        }}
+      >
         Cadence
-        <select value={cadence} onChange={(e) => setCadence(e.target.value)}>
+        <select
+          className="input-capsule"
+          value={cadence}
+          onChange={(e) => setCadence(e.target.value)}
+        >
           <option value="none">none</option>
           <option value="special-occasions">special-occasions</option>
           <option value="monthly">monthly</option>

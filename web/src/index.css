@@ -1,43 +1,156 @@
 :root {
-  --color-bg: #f4f3ee;
-  --color-surface: #ffffff;
-  --color-surface-variant: #ebe8df;
-  --color-primary: #4a6048;
+  --color-sage-100: #eaefea;
+  --color-sage-300: #a8bba6;
+  --color-sage-500: #7ca17a;
+  --color-sage-700: #4a6048;
+  --color-sage-900: #243123;
+
+  --color-amber-400: #d18057;
+  --color-amber-600: #b86b43;
+
+  --color-neutral-0: #ffffff;
+  --color-neutral-50: #f4f3ee;
+  --color-neutral-100: #ebe8df;
+  --color-neutral-200: #dcd8cd;
+  --color-neutral-700: #2e332f;
+  --color-neutral-800: #1c1f1d;
+  --color-neutral-900: #121413;
+
+  /* Semantic Theme Variables - Light Mode Default */
+  --color-bg: var(--color-neutral-50);
+  --color-surface: var(--color-neutral-0);
+  --color-surface-variant: var(--color-neutral-100);
+  --color-primary: var(--color-sage-700);
+  --color-primary-hover: #3b4e39;
+  --color-secondary-accent: #869784;
   --color-text: #1c201d;
   --color-text-muted: #666e65;
-  --color-border: #dcd8cd;
-  --color-milestone: #b86b43;
+  --color-border: var(--color-neutral-200);
+  --color-milestone: var(--color-amber-600);
+  --color-badge-bg: rgba(74, 96, 72, 0.12);
+  --color-danger: #c94a4a;
+  --color-danger-bg: rgba(201, 74, 74, 0.1);
+  --color-success: #388e3c;
+  --color-success-bg: rgba(56, 142, 60, 0.12);
+
   --radius-card: 16px;
   --radius-pill: 20px;
   --radius-input: 24px;
+
   --space-xs: 4px;
   --space-sm: 8px;
   --space-md: 12px;
   --space-lg: 16px;
   --space-xl: 24px;
+  --space-xxl: 32px;
+
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
 }
 
+/* Explicit Dark Theme */
+[data-theme="dark"] {
+  --color-bg: var(--color-neutral-900);
+  --color-surface: var(--color-neutral-800);
+  --color-surface-variant: #262a27;
+  --color-primary: var(--color-sage-500);
+  --color-primary-hover: #92b790;
+  --color-secondary-accent: #3d493c;
+  --color-text: #eaece8;
+  --color-text-muted: #9ca39b;
+  --color-border: var(--color-neutral-700);
+  --color-milestone: var(--color-amber-400);
+  --color-badge-bg: rgba(124, 161, 122, 0.2);
+  --color-danger: #e57373;
+  --color-danger-bg: rgba(229, 115, 115, 0.15);
+  --color-success: #81c784;
+  --color-success-bg: rgba(129, 199, 132, 0.15);
+
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+/* Auto Dark Theme when no data-theme override is present */
 @media (prefers-color-scheme: dark) {
-  :root {
-    --color-bg: #121413;
-    --color-surface: #1c1f1d;
+  :root:not([data-theme="light"]) {
+    --color-bg: var(--color-neutral-900);
+    --color-surface: var(--color-neutral-800);
     --color-surface-variant: #262a27;
-    --color-primary: #7ca17a;
+    --color-primary: var(--color-sage-500);
+    --color-primary-hover: #92b790;
+    --color-secondary-accent: #3d493c;
     --color-text: #eaece8;
     --color-text-muted: #9ca39b;
-    --color-border: #2e332f;
-    --color-milestone: #d18057;
+    --color-border: var(--color-neutral-700);
+    --color-milestone: var(--color-amber-400);
+    --color-badge-bg: rgba(124, 161, 122, 0.2);
+    --color-danger: #e57373;
+    --color-danger-bg: rgba(229, 115, 115, 0.15);
+    --color-success: #81c784;
+    --color-success-bg: rgba(129, 199, 132, 0.15);
+
+    --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
   }
 }
 
 * {
   box-sizing: border-box;
 }
+
 body {
   margin: 0;
-  background: var(--color-bg);
+  padding: 0;
+  background-color: var(--color-bg);
   color: var(--color-text);
-  font-family: -apple-system, "SF Pro Text", system-ui, sans-serif;
+  font-family: -apple-system, "SF Pro Text", "Inter", "Roboto", system-ui, sans-serif;
   font-size: 14px;
   line-height: 20px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease;
+}
+
+/* Typography styles per DESIGN.md */
+h1.title-display,
+.title-display {
+  font-family: "Georgia", "New York", serif;
+  font-size: 22px;
+  line-height: 28px;
+  font-weight: 700;
+  color: var(--color-primary);
+  margin: 0;
+}
+
+h2.section-heading,
+.section-heading {
+  font-size: 18px;
+  line-height: 24px;
+  font-weight: 600;
+  color: var(--color-text);
+  margin: 0;
+}
+
+h3.card-title,
+.card-title {
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 600;
+  color: var(--color-text);
+  margin: 0;
+}
+
+.body-regular {
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 400;
+}
+
+.caption-meta {
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 500;
+  color: var(--color-text-muted);
 }
