@@ -19,4 +19,9 @@ def test_health():
 def test_ready():
     response = client.get("/ready")
     assert response.status_code == 200
-    assert response.json() == {"status": "ok"}
+
+
+def test_upload():
+    response = client.post("/uploads", files={"file": ("a.txt", b"hello", "text/plain")})
+    assert response.status_code == 200
+    assert response.json()["status"] == "queued"

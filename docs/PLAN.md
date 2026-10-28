@@ -232,7 +232,8 @@ docs/         architecture.md, EVENTS.md (event catalog: emitter/consumer/purpos
 | 5   | Frontend             | Drop Zone + invite claim + alias picker + cadence picker, chat UI, voice/photo capture, timeline with threads/chapters, owner review queue, Easy Auth, UI/UX polish (responsive layout, theming, accessibility)                                |
 | 6   | Voice/photo pipeline | Blob (tiering, compressed formats) -> Service Bus -> STT -> transcript back to Cosmos                                                                                                                                                          |
 | 7   | Observability        | OpenTelemetry end-to-end, KQL workbook (incl. flag rate), DLQ alert                                                                                                                                                                            |
-| 8   | Productization       | Multi-household invites, milestone grouping polish, digest generation, JSON export / physical-book stub; freemium noted as future, out of scope                                                                                                |
+| 8   | Frontend             | Improve web application to match design documentation                                                                                                                                                                                          |
+| 9   | Productization       | Multi-household invites, milestone grouping polish, digest generation, JSON export / physical-book stub; freemium noted as future, out of scope                                                                                                |
 
 **Phases run in the order above**, sequentially, one step at a time — no
 skipping ahead, no pre-implementation of later steps or phases. Each phase uses a

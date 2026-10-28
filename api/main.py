@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, File, UploadFile
 from pydantic import BaseModel
 
 from curator import list_memories, record_memory
@@ -38,6 +38,12 @@ class MemoryResponse(BaseModel):
     alias_at_write_time: str = ""
     alias_change_requested: bool = False
     requested_alias: str | None = None
+
+
+@app.post("/uploads")
+async def upload_file(file: UploadFile = File(...)):  # noqa: B008
+    data = await file.read()
+    return {"filename": file.filename, "size": len(data), "status": "queued"}
 
 
 @app.get("/health")
