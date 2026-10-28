@@ -15,7 +15,19 @@ a function key, and the sink exists to receive those deliveries. Authenticated
 HTTP endpoints added in later steps set their own level and key/identity check.
 """
 
+import os
+
 import azure.functions as func
+
+# Best-effort OpenTelemetry / Application Insights wiring for the Functions host.
+try:
+    from azure.monitor.opentelemetry import configure_azure_monitor
+
+    _conn = os.getenv("APPLICATIONINSIGHTS_CONNECTION_STRING")
+    if _conn:
+        configure_azure_monitor(connection_string=_conn)
+except ImportError:  # pragma: no cover
+    pass
 from cosmos_changefeed import bp as cosmos_changefeed_bp
 from event_logger import bp as event_logger_bp
 from http_invite_claim import bp as http_invite_claim_bp
