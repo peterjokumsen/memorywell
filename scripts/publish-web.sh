@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
 RG="${1:-}"
 APP="${2:-}"
 
@@ -9,7 +11,7 @@ if [[ -z "$RG" || -z "$APP" ]]; then
   exit 1
 fi
 
-cd "$(dirname "$0")/../web"
+cd "$ROOT/web"
 npm ci
 npm run build
 
