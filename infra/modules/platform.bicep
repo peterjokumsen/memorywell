@@ -73,7 +73,7 @@ module cosmos 'cosmos.bicep' = if (!containerOnly) {
   }
 }
 
-var includeRedis = !containerOnly && inputs.global.mode != 'skip-redis'
+var includeRedis = !containerOnly && inputs.global.mode != 'skip-redis' && inputs.global.environment != 'prod'
 module redis 'redis.bicep' = if (includeRedis) {
   name: '${deployment().name}-redis'
   params: {
