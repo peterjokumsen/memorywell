@@ -7,7 +7,7 @@ RG="${1:-}"
 APP="${2:-}"
 
 if [[ -z "$RG" || -z "$APP" ]]; then
-  echo "Usage: $0 <resource-group> <web-app-name>"
+  echo "Usage: $0 <resource-group> <static-web-app-name>"
   exit 1
 fi
 
@@ -15,7 +15,6 @@ cd "$ROOT/web"
 npm ci
 npm run build
 
-cd dist
-zip -r /tmp/web.zip . >/dev/null
-az webapp deploy --resource-group "$RG" --name "$APP" --src-path /tmp/web.zip --type zip
+TOKEN="$(az staticwebapp secrets list --name "$APP" --resource-group "$RG" --query properties.apiKey -o tsv)"
+npx --yes @azure/static-web-apps-cli deploy ./dist --deployment-token "$TOKEN" --env production
 echo "Published web to $APP"
