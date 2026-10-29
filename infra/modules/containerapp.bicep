@@ -12,7 +12,6 @@ param env {
   cosmosDatabase: string
   cosmosEndpoint: string
   keyVaultUri: string
-  redisConnKey: string
   postgresConnKey: string
 }
 
@@ -39,11 +38,6 @@ var secrets = inputs.global.mode == 'container-apps'
         keyVaultUrl: '${env.keyVaultUri}secrets/${env.postgresConnKey}'
         identity: identityId
       }
-      {
-        name: env.redisConnKey
-        keyVaultUrl: '${env.keyVaultUri}secrets/${env.redisConnKey}'
-        identity: identityId
-      }
     ]
 
 var environmentVariables = inputs.global.mode == 'container-apps'
@@ -55,10 +49,6 @@ var environmentVariables = inputs.global.mode == 'container-apps'
       {
         name: 'POSTGRES_CONNECTION_STRING'
         secretRef: env.postgresConnKey
-      }
-      {
-        name: 'REDIS_URL'
-        secretRef: env.redisConnKey
       }
     ]
 
