@@ -173,7 +173,7 @@ on Azure) stack, which remains the core learning goal.
 ```plaintext
 memorywell/
   infra/        Bicep: shared.bicep (shared RG: ACR, future appconfig) +
-                modules acr, containerapps, cosmos, postgres, redis,
+                modules acr, containerapps, cosmos, postgres,
                 servicebus, eventgrid, functions, keyvault, appconfig, monitor
   api/          FastAPI container: prompter.py, curator.py, guardian.py, shared
                 rag.py, conversations, persona, voice/photo upload

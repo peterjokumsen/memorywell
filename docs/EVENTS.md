@@ -73,7 +73,6 @@ flowchart LR
     t_areq --> s_guard
     sgb -->|"alias valid → auto-apply"| t_aupd
     sgb -->|"alias invalid → flag"| t_flag
-    t_aupd -->|"invalidate alias cache"| redis[("Redis<br/>alias lookups")]
     t_aupd -->|"planned: confirm in next prompt"| prompter
     t_aupd -->|"guardian-review (built)"| s_guard
     timer -->|"checkin.due"| egrid
@@ -86,7 +85,6 @@ flowchart LR
     stt -->|"transcript + audio link"| cosmos
     cosmos -->|"change feed"| cf
     cf -->|"embeddings"| pg
-    cf -->|"cache refresh"| redis
     web -->|"invite claim"| httpf
     httpf -->|"membership write"| cosmos
     curator -.->|"mirrored domain events (gap 2)"| egrid

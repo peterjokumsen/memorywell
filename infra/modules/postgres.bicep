@@ -68,8 +68,7 @@ output databaseName string = database.name
 // A postgresql:// URL, not the ADO.NET `Host=…;Port=…` form. psycopg3 accepts
 // only a URI or libpq keyword/value conninfo (`host=`, `dbname=`, …); handed the
 // ADO string it fails with `invalid connection option "Host"`. The URL also
-// matches how the value is used everywhere: `psycopg.connect(URL)`. Same reason
-// redis.bicep emits rediss:// instead of an Azure key string.
+// matches how the value is used everywhere: `psycopg.connect(URL)`.
 //
 // uriComponentToString() percent-encodes login and password. The password comes
 // from .env, so it can hold `@ : / ? #` — unescaped those truncate the URL into

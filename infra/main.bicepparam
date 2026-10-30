@@ -14,4 +14,3 @@ param postgresKeyName = readEnvironmentVariable('POSTGRES_CONNECTION_STRING_KEY'
 param cosmosAccountName = readEnvironmentVariable('COSMOS_ACCOUNT_NAME', '')
 param cosmosDatabase = readEnvironmentVariable('COSMOS_DATABASE', '')
 param developerPrincipalObjectId = readEnvironmentVariable('DEVELOPER_OBJECT_ID', '')
-param redisKeyName = readEnvironmentVariable('REDIS_URL_KEY', '')

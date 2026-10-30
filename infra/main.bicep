@@ -17,7 +17,6 @@ param postgresKeyName string
 param cosmosAccountName string
 param cosmosDatabase string
 param developerPrincipalObjectId string
-param redisKeyName string
 // Event Grid webhook subscriptions are only valid once the Function App they
 // point at is answering its validation handshake. provision-env.sh deploys
 // twice on a full run: infrastructure with this false, then code, then true.
@@ -43,7 +42,6 @@ var globalInputs GlobalInputs = {
   developerPrincipalObjectId: environment != 'dev' ? '' : developerPrincipalObjectId
   keys: {
     postgres: !empty(postgresKeyName) ? postgresKeyName : fail('postgresSecretKey is not set')
-    redis: !empty(redisKeyName) ? redisKeyName : fail('redisSecretKey is not set')
   }
 }
 

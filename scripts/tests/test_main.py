@@ -12,7 +12,7 @@ network, no credentials. Seed data shape stays in test_seed_cosmos.py.
 
 import pytest
 import seed
-from fakes import FakeCosmosDb, FakeRedis, FakeSecret, FakeSqlConn
+from fakes import FakeCosmosDb, FakeSecret, FakeSqlConn
 
 CONTAINERS = (
     "households",
@@ -65,7 +65,6 @@ def wired(monkeypatch):
     monkeypatch.setattr(seed, "CosmosClient", StubCosmosClient)
     monkeypatch.setattr(seed, "SecretClient", StubSecretClient)
     monkeypatch.setattr(seed.psycopg, "connect", fake_connect)
-    monkeypatch.setattr(seed.redis.Redis, "from_url", lambda *a, **k: FakeRedis())
     return {"db": db, "connections": connections}
 
 
