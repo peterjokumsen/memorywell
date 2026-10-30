@@ -37,7 +37,3 @@ CREATE TABLE IF NOT EXISTS documents (
 ```
 
 `id` = `uuid5(NAMESPACE_URL, cosmos memory id)` (stable). `embedding` left NULL at seed; filled later via change feed.
-
-## Redis
-
-Alias-lookup key (`ALIAS_LOOKUP_KEY`) stores JSON map contributorId -> displayAlias. No TTL at seed.
