@@ -12,8 +12,12 @@ if [[ -z "$RG" || -z "$APP" ]]; then
 fi
 
 cd "$ROOT/web"
+if [[ -z "${VITE_API_BASE_URL:-}" ]]; then
+  echo "VITE_API_BASE_URL must be set (e.g. the Container App URL)" >&2
+  exit 1
+fi
 npm ci
-npm run build
+VITE_API_BASE_URL="$VITE_API_BASE_URL" npm run build
 
 TOKEN="$(az staticwebapp secrets list --name "$APP" --resource-group "$RG" --query properties.apiKey -o tsv)"
 npx --yes @azure/static-web-apps-cli deploy ./dist --deployment-token "$TOKEN" --env production

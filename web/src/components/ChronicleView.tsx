@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigation } from "../context/useNavigation";
 import type { Memory } from "../types";
+import { createMemory, listMemories } from "../api/memories";
 
 const INITIAL_MEMORIES: Memory[] = [
   {
@@ -43,33 +44,32 @@ const INITIAL_MEMORIES: Memory[] = [
   },
 ];
 
-function createNewMemory(
-  chronicleId: string,
-  text: string,
-  hasAudio: boolean,
-  recordSeconds: number,
-  photoSelected: string | null,
-): Memory {
-  return {
-    id: `m-${Date.now()}`,
-    chronicleId,
-    authorName: "Eleanor Vance",
-    authorAlias: "Gaga",
-    authorRelation: "Maternal Grandmother",
-    date: "Just now",
-    text: text.trim() || (photoSelected ? "Shared a new family photo." : "Voice memory recorded."),
-    hasAudio: hasAudio || recordSeconds > 0,
-    audioDuration: recordSeconds > 0 ? `0:${recordSeconds.toString().padStart(2, "0")}` : undefined,
-    tags: ["#prompt-reply", "#family-story"],
-    milestoneChapter: "Walking & First Steps",
-  };
-}
-
 export function ChronicleView() {
   const { childId, navigate } = useNavigation();
   const [activeTab, setActiveTab] = useState<"timeline" | "contributors" | "chapters">("timeline");
   const [activeChapterFilter, setActiveChapterFilter] = useState<string>("all");
   const [memories, setMemories] = useState<Memory[]>(INITIAL_MEMORIES);
+
+  useEffect(() => {
+    listMemories(childId)
+      .then((items) =>
+        setMemories(
+          items.map((m, i) => ({
+            id: `m-${i}`,
+            chronicleId: m.chronicle_id,
+            authorName: m.contributor_id,
+            authorAlias: m.alias_at_write_time || "Contributor",
+            authorRelation: "",
+            date: m.date || "Just now",
+            text: m.text,
+            hasAudio: false,
+            tags: [],
+            milestoneChapter: m.milestone || undefined,
+          })),
+        ),
+      )
+      .catch(() => setMemories([]));
+  }, [childId]);
   const [promptReplied, setPromptReplied] = useState(false);
   const [replyInput, setReplyInput] = useState("");
   const [isRecording, setIsRecording] = useState(false);
@@ -80,18 +80,31 @@ export function ChronicleView() {
   const childName = childId === "maya" ? "Maya" : "Leo";
   const childAge = childId === "maya" ? "Age 1" : "Age 3";
 
-  const handleSendReply = () => {
+  const handleSendReply = async () => {
     if (!replyInput.trim() && !isRecording && !photoSelected) return;
-
-    const newMemory = createNewMemory(
-      childId,
-      replyInput,
-      isRecording,
-      recordSeconds,
-      photoSelected,
-    );
-
+    const newMemory: Memory = {
+      id: `m-${Date.now()}`,
+      chronicleId: childId,
+      authorName: "Eleanor Vance",
+      authorAlias: "Gaga",
+      authorRelation: "Maternal Grandmother",
+      date: "Just now",
+      text:
+        replyInput.trim() ||
+        (photoSelected ? "Shared a new family photo." : "Voice memory recorded."),
+      hasAudio: isRecording || recordSeconds > 0,
+      audioDuration:
+        recordSeconds > 0 ? `0:${recordSeconds.toString().padStart(2, "0")}` : undefined,
+      tags: ["#prompt-reply", "#family-story"],
+      milestoneChapter: "Walking & First Steps",
+    };
     setMemories([newMemory, ...memories]);
+    void createMemory(
+      childId,
+      "contributor-1",
+      "Gaga",
+      replyInput.trim() || "Shared a memory.",
+    ).catch(() => {});
     setReplyInput("");
     setPhotoSelected(null);
     setIsRecording(false);

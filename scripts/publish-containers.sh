@@ -319,7 +319,7 @@ DEPLOYMENT_NAME="$(cat "$LAST_DEPLOYMENT_FILE")"
 export DEPLOYMENT_NAME
 
 step "Fetching Bicep deployment outputs..."
-DEPLOYMENT_OUTPUTS="$(fetch_deployment_outputs "$DEPLOYMENT_NAME" \
+DEPLOYMENT_OUTPUTS="$(fetch_deployment_outputs "$DEPLOYMENT_NAME-1" \
   "[properties.outputs.registryName.value, properties.outputs.loginServer.value]" 2)" || exit 1
 IFS=$'\t' read -r REGISTRY LOGIN_SERVER <<< "$DEPLOYMENT_OUTPUTS" || true
 
