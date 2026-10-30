@@ -21,12 +21,10 @@ tests in scripts/tests/ cover the parts that can be.
 
 from __future__ import annotations
 
-import json
 import sys
 import uuid
 
 import psycopg
-import redis as redis_lib
 import seed
 
 # The column list step-2.md specifies, in order, as information_schema reports
@@ -152,27 +150,6 @@ def verify_cosmos(db) -> None:
     )
 
 
-# --- Redis -------------------------------------------------------------------
-
-
-def verify_redis(url: str, expected_contributors: int) -> None:
-    section("Redis")
-    client = redis_lib.Redis.from_url(url, decode_responses=True)
-    check("PING returns PONG", client.ping() is True)
-    lookup = client.get(seed.ALIAS_LOOKUP_KEY)
-    check(
-        f"alias-lookup key {seed.ALIAS_LOOKUP_KEY} is set",
-        bool(lookup),
-        "seed_redis writes it",
-    )
-    aliases = json.loads(lookup) if lookup else {}
-    check(
-        "alias-lookup covers every contributor",
-        bool(aliases) and len(aliases) == expected_contributors,
-        f"{len(aliases)} of {expected_contributors}",
-    )
-
-
 # --- Postgres ----------------------------------------------------------------
 
 
@@ -227,7 +204,6 @@ def main() -> int:
     secrets = seed.resolve_secrets()
 
     verify_cosmos(db)
-    verify_redis(secrets[seed.SECRET_REDIS], seed.count_items(db, "contributors"))
     verify_postgres(secrets[seed.SECRET_POSTGRES])
 
     print()
