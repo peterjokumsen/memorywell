@@ -67,12 +67,7 @@ export COSMOS_ACCOUNT_NAME COSMOS_DATABASE COSMOS_ENDPOINT SHARED_ACR_NAME SHARE
 
 # Keys used for secrets
 POSTGRES_CONNECTION_STRING_KEY="postgres-connection-string"
-# Renamed from redis-connection-string: the stored value is a rediss:// URL, not
-# an Azure key string. The old name described the wrong thing, and a leftover
-# secret under it is how the next reader picks up the wrong format.
-REDIS_URL_KEY="redis-url"
-
-export POSTGRES_CONNECTION_STRING_KEY REDIS_URL_KEY
+export POSTGRES_CONNECTION_STRING_KEY
 
 registry_name() { echo "$SHARED_ACR_NAME"; }
 login_server() { echo "${SHARED_ACR_NAME}.azurecr.io"; }

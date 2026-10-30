@@ -16,7 +16,6 @@ and never from a literal in this file. See docs/phase-2/step-5.md.
 
 from __future__ import annotations
 
-import json
 import os
 import uuid
 from datetime import UTC, datetime
@@ -25,7 +24,6 @@ from datetime import UTC, datetime
 # is why they carry noqa — the scaffold has to lint clean so the pre-commit
 # hook and CI pass while it is still a stub. Drop the noqa as each is used.
 import psycopg
-import redis
 from azure.cosmos import CosmosClient, PartitionKey  # noqa: F401
 from azure.identity import DefaultAzureCredential
 from azure.keyvault.secrets import SecretClient
@@ -45,7 +43,6 @@ from psycopg.types.json import Json
 # platform.bicep -> secret.bicep); the drift test in tests/test_seed.py fails if
 # these two ever diverge.
 SECRET_POSTGRES = "postgres-connection-string"
-SECRET_REDIS = "redis-url"
 
 # Step 2 fixed this at 1536 to match the Cosmos memories vector index
 # (docs/phase-2/step-1.md). Changing one side means changing both.
@@ -56,12 +53,6 @@ EMBEDDING_DIMS = 1536
 HOUSEHOLD_ID = "hh-seed-1"
 CHRONICLE_IDS = ("chron-seed-1", "chron-seed-2")
 MEMORY_ID = "mem-seed-1"
-
-# Redis key for the chronicle -> alias lookup. Fixed string rather than derived
-# from the household id: this is one household's seed, and Phase 4a will define
-# the real key scheme (possibly namespaced per household). Prefix makes the
-# intent obvious and keeps it from colliding once other households exist.
-ALIAS_LOOKUP_KEY = "seed:alias-lookup"
 
 
 def now_iso() -> str:
@@ -173,12 +164,12 @@ def resolve_cosmos() -> tuple[CosmosClient, str, str]:
 
 
 def resolve_secrets() -> dict[str, str]:
-    """Return {SECRET_POSTGRES: value, SECRET_REDIS: value} from Key Vault."""
+    """Return {SECRET_POSTGRES: value} from Key Vault."""
     client = SecretClient(
         vault_url=f"https://{require_env(CONFIG_NAMES.vault_name)}.vault.azure.net",
         credential=DefaultAzureCredential(),
     )
-    return {name: client.get_secret(name).value for name in (SECRET_POSTGRES, SECRET_REDIS)}
+    return {name: client.get_secret(name).value for name in (SECRET_POSTGRES,)}
 
 
 # --- Postgres ---------------------------------------------------------------
@@ -423,22 +414,6 @@ def seed_cosmos(db) -> dict:
     return memory
 
 
-# --- Redis ------------------------------------------------------------------
-
-
-def seed_redis(conn: redis.Redis) -> None:
-    """PING the cache and write the alias-lookup key.
-
-    Phase 2 only proves connectivity and seeds the key shape; TTL-caching
-    behaviour arrives in later phases, so no expiry is set here.
-    """
-    if not conn.ping():
-        raise RuntimeError("Redis PING did not return True — cache unreachable?")
-
-    lookup = {contributor["id"]: contributor["displayAlias"] for contributor in _contributors()}
-    conn.set(ALIAS_LOOKUP_KEY, json.dumps(lookup))
-
-
 # --- Entry point ------------------------------------------------------------
 
 
@@ -487,11 +462,6 @@ def main() -> None:
 
         memory = seed_cosmos(db)
         seed_documents(conn, memory)
-
-        # from_url, no parsing: redis.bicep stores a rediss:// URL precisely so
-        # every client gets one obvious call. The old Azure key string
-        # (host:6380,password=...,ssl=True) is not a URL and needed a parser.
-        seed_redis(redis.Redis.from_url(secrets[SECRET_REDIS], decode_responses=True))
 
         counts = {
             name: count_items(db, name)

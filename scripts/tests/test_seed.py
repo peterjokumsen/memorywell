@@ -25,7 +25,6 @@ from pathlib import Path
 
 import pytest
 import seed
-from fakes import FakeRedis
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 COSMOS_BICEP = REPO_ROOT / "infra" / "modules" / "cosmos.bicep"
@@ -62,7 +61,7 @@ def _common_sh_secret_names() -> dict[str, str]:
     """
     text = COMMON_SH.read_text()
     found = {}
-    for name in ("POSTGRES_CONNECTION_STRING_KEY", "REDIS_URL_KEY"):
+    for name in ("POSTGRES_CONNECTION_STRING_KEY",):
         match = re.search(rf'^{name}="([^"]*)"', text, re.MULTILINE)
         assert match is not None, f"{name} not assigned in {COMMON_SH}"
         found[name] = match.group(1)
@@ -88,29 +87,6 @@ def test_secret_names_match_common_sh():
         f"seed.SECRET_POSTGRES is {seed.SECRET_POSTGRES!r} but common.sh sets "
         f"POSTGRES_CONNECTION_STRING_KEY to {names['POSTGRES_CONNECTION_STRING_KEY']!r}. "
         f"Change both."
-    )
-    assert seed.SECRET_REDIS == names["REDIS_URL_KEY"], (
-        f"seed.SECRET_REDIS is {seed.SECRET_REDIS!r} but common.sh sets "
-        f"REDIS_URL_KEY to {names['REDIS_URL_KEY']!r}. Change both."
-    )
-
-
-def test_redis_secret_is_a_url_not_an_azure_key_string():
-    """The redis secret must be a rediss:// URL, whatever the account produced.
-
-    Azure's listKeys() gives `host:6380,password=...,ssl=True`, which is not a
-    URL. Storing that format cost a hand-written parser in seed.py once already,
-    and the API would have had to repeat it. Asserting the shape at the point of
-    production is what stops it coming back.
-
-    redis.bicep builds the URL; this only pins the scheme so the two agree.
-    """
-    redis_bicep = (REPO_ROOT / "infra" / "modules" / "redis.bicep").read_text()
-
-    url_output = next(line for line in redis_bicep.splitlines() if "output connectionUrl" in line)
-    assert "rediss://" in url_output, (
-        "redis.bicep must emit a rediss:// URL for the redis-url secret; "
-        "Redis.from_url() cannot parse Azure's key string"
     )
 
 
@@ -196,44 +172,9 @@ def test_resolve_secrets_reads_both_from_key_vault(vault_env, monkeypatch):
 
     assert made["vault_url"] == "https://kv-test.vault.azure.net"
     assert secrets[seed.SECRET_POSTGRES] == f"value-for-{seed.SECRET_POSTGRES}"
-    assert secrets[seed.SECRET_REDIS] == f"value-for-{seed.SECRET_REDIS}"
 
 
 def test_resolve_secrets_requires_vault_name(vault_env, monkeypatch):
     vault_env.delenv("VAULT_NAME")
     with pytest.raises(SystemExit):
         seed.resolve_secrets()
-
-
-# --- seed_redis --------------------------------------------------------------
-
-
-def test_seed_redis_pings_and_expects_pong():
-    conn = FakeRedis(pong=True)
-    seed.seed_redis(conn)
-
-    assert conn.ping_calls >= 1, "seed must prove connectivity with PING"
-
-
-def test_seed_redis_writes_an_alias_lookup_key():
-    """The alias-lookup key is the cache shape Phase 4a/4b relies on.
-
-    Asserts that a key was written, not its name — the key format is not pinned
-    anywhere yet. Tighten once it is.
-    """
-    conn = FakeRedis()
-    seed.seed_redis(conn)
-
-    assert conn.set_calls, "seed must write the alias-lookup key"
-
-
-def test_seed_redis_fails_loudly_when_ping_fails():
-    """A cache that cannot be reached should not pass silently.
-
-    RuntimeError, not AssertionError: the docstring in seed.py says to assert
-    ping(), but raising from that assert would surface as an AssertionError,
-    which reads like a broken test rather than an unreachable cache.
-    """
-    conn = FakeRedis(pong=False)
-    with pytest.raises(RuntimeError):
-        seed.seed_redis(conn)

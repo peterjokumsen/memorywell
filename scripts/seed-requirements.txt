@@ -2,7 +2,6 @@ azure-identity==1.19.0
 azure-cosmos==4.9.0
 azure-keyvault-secrets==4.7.0
 psycopg[binary]==3.2.3
-redis==5.2.1
 # Test runner only, not imported by seed.py. Kept here so one file installs
 # everything scripts/ needs, matching api/requirements.txt which also carries
 # its own pytest.

@@ -2,14 +2,12 @@
 type EnvironmentType = 'dev' | 'test' | 'prod'
 
 @export()
-type DeploymentMode = 'all' | 'container-apps' | 'databases' | 'skip-redis'
+type DeploymentMode = 'all' | 'container-apps' | 'databases'
 
 @export()
 type SecretKeys = {
   @description('Key used for Postgres connection string')
   postgres: string
-  @description('Key used for Redis connection string')
-  redis: string
 }
 
 @export()
