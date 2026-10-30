@@ -1,7 +1,7 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import App from "./App";
 
-test("renders app", () => {
+test("renders app", async () => {
   render(<App />);
-  expect(screen.getByRole("heading", { level: 1 })).toBeTruthy();
+  await waitFor(() => expect(screen.getByText(/Memorywell|Loading/i)).toBeTruthy());
 });

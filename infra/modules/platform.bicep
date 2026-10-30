@@ -73,24 +73,6 @@ module cosmos 'cosmos.bicep' = if (!containerOnly) {
   }
 }
 
-var includeRedis = !containerOnly && inputs.global.mode != 'skip-redis' && inputs.global.environment != 'prod'
-module redis 'redis.bicep' = if (includeRedis) {
-  name: '${deployment().name}-redis'
-  params: {
-    inputs: inputs
-  }
-}
-
-var redisConnKey = inputs.global.keys.redis
-module redisConnectionString 'secret.bicep' = if (includeRedis) {
-  name: '${deployment().name}-redis-conn'
-  params: {
-    inputs: inputs
-    secretName: redisConnKey
-    secretValue: redis!.outputs!.connectionUrl
-  }
-}
-
 module postgres 'postgres.bicep' = if (!containerOnly) {
   name: '${deployment().name}-postgres'
   params: {
@@ -128,7 +110,6 @@ module containerApp 'containerapp.bicep' = if (!databaseOnly) {
       cosmosEndpoint: cosmos.?outputs.accountEndpoint ?? nullDefault
       keyVaultUri: keyVault.?outputs.keyVaultUri ?? nullDefault
       postgresConnKey: postgresConnectionString.?outputs.keyName ?? nullDefault
-      redisConnKey: redisConnectionString.?outputs.keyName ?? nullDefault
     }
   }
 }
@@ -194,7 +175,6 @@ module eventGrid 'eventgrid.bicep' = if (!databaseOnly) {
 
 output appName string = containerApp.?outputs.appName ?? nullDefault
 output fqdn string = containerApp.?outputs.fqdn ?? nullDefault
-output redisHostName string = redis.?outputs.hostName ?? nullDefault
 output storageAccountId string = storage.outputs.storageAccountId
 output eventGridDomainName string = eventGrid.?outputs.domainName ?? nullDefault
 output eventGridDomainEndpoint string = eventGrid.?outputs.domainEndpoint ?? nullDefault

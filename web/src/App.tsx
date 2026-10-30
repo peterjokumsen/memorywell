@@ -7,6 +7,7 @@ import { GuardianReview } from "./components/GuardianReview";
 import { InviteClaimView } from "./components/InviteClaimView";
 import { ThemeProvider } from "./context/ThemeContext";
 import { NavigationProvider } from "./context/NavigationContext";
+import { EasyAuthProvider } from "./auth/EasyAuth";
 import { useNavigation } from "./context/useNavigation";
 import "./App.css";
 
@@ -30,11 +31,13 @@ function MainContent() {
 
 function App() {
   return (
-    <ThemeProvider>
-      <NavigationProvider>
-        <MainContent />
-      </NavigationProvider>
-    </ThemeProvider>
+    <EasyAuthProvider>
+      <ThemeProvider>
+        <NavigationProvider>
+          <MainContent />
+        </NavigationProvider>
+      </ThemeProvider>
+    </EasyAuthProvider>
   );
 }
 
