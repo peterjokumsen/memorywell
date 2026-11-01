@@ -15,7 +15,7 @@ export async function apiFetch(path: string, init?: RequestInit): Promise<Respon
 export async function functionsFetch(path: string, init?: RequestInit): Promise<Response> {
   return fetch(`${FUNCTIONS_BASE}${path}`, {
     ...init,
-    credentials: "include",
+    credentials: "omit",
     headers: {
       "Content-Type": "application/json",
       ...(init?.headers ?? {}),
