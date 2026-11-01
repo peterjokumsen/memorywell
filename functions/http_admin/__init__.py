@@ -11,6 +11,32 @@ from azure.identity import DefaultAzureCredential
 
 bp = func.Blueprint()
 
+
+def _principal(req):
+    import base64
+    import json
+
+    raw = req.headers.get("X-MS-CLIENT-PRINCIPAL")
+    if not raw:
+        return None
+    try:
+        decoded = base64.b64decode(raw)
+        return json.loads(decoded)
+    except Exception:
+        return None
+
+
+def _is_admin(req):
+    p = _principal(req)
+    if p is None:
+        return True  # dev/local fallback
+    roles = p.get("userRoles") or []
+    claims = p.get("claims", [])
+    role_claims = [c.get("val") for c in claims if c.get("typ") == "roles"]
+    all_roles = set(roles) | set(role_claims)
+    return bool(all_roles & {"Owner", "Co-Owner", "admin"})
+
+
 CONTAINER_PKS = {
     "households": "/id",
     "chronicles": "/householdId",
@@ -57,6 +83,8 @@ def http_households(req: func.HttpRequest) -> func.HttpResponse:
         body = req.get_json()
     except ValueError:
         body = {}
+    if not _is_admin(req):
+        return _fail("Forbidden", 403)
     name = (body.get("name") or "").strip()
     if not name:
         return _fail("Missing name")
