@@ -1,5 +1,6 @@
-const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
-const FUNCTIONS_BASE = import.meta.env.VITE_FUNCTIONS_BASE_URL ?? "http://localhost:7071";
+const runtimeConfig = (window as any).__APP_CONFIG || {};
+const API_BASE = runtimeConfig.apiBaseUrl ?? "http://localhost:8000";
+const FUNCTIONS_BASE = runtimeConfig.functionsBaseUrl ?? "http://localhost:7071";
 
 export async function apiFetch(path: string, init?: RequestInit): Promise<Response> {
   return fetch(`${API_BASE}${path}`, {
