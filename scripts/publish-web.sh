@@ -35,5 +35,5 @@ npm ci
 VITE_API_BASE_URL="$API_BASE_URL" VITE_FUNCTIONS_BASE_URL="$FUNCTIONS_BASE_URL" npm run build
 
 step "Deploying web..."
-npx --yes @azure/static-web-apps-cli deploy ./dist --deployment-token "$TOKEN" --env production
+npx --yes @azure/static-web-apps-cli deploy ./dist --api-location ./api --api-language python --api-version 3.11 --deployment-token "$TOKEN" --env production
 echo "Published web"
