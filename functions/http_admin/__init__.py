@@ -45,9 +45,11 @@ CONTAINER_PKS = {
 
 
 def _db():
-    endpoint = os.environ.get("COSMOS_ENDPOINT")
-    database = os.environ.get("COSMOS_DATABASE")
-    if not endpoint or not database:
+    endpoint = os.environ.get("COSMOS_ENDPOINT") or os.environ.get(
+        "CosmosDBConnection__accountEndpoint"
+    )
+    database = os.environ.get("COSMOS_DATABASE") or "memorywell"
+    if not endpoint:
         return None
     client = CosmosClient(endpoint, credential=DefaultAzureCredential())
     return client.get_database_client(database)
