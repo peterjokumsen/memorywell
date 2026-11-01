@@ -72,19 +72,38 @@ def _now():
     return datetime.datetime.now(datetime.UTC).isoformat()
 
 
+CORS_HEADERS = {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization",
+}
+
+
+def _cors(resp):
+    for k, v in CORS_HEADERS.items():
+        resp.headers[k] = v
+    return resp
+
+
 def _fail(msg, code=400):
-    return func.HttpResponse(msg, status_code=code)
+    return _cors(func.HttpResponse(msg, status_code=code))
 
 
-@bp.route(route="households", methods=["GET", "POST"], auth_level=func.AuthLevel.ANONYMOUS)
+@bp.route(
+    route="households", methods=["GET", "POST", "OPTIONS"], auth_level=func.AuthLevel.ANONYMOUS
+)
 def http_households(req: func.HttpRequest) -> func.HttpResponse:
     db = _db()
+    if req.method == "OPTIONS":
+        return _cors(func.HttpResponse("", status_code=204))
     if db is None:
         return _fail("Cosmos not configured", 503)
     if req.method == "GET":
         q = "SELECT * FROM c"
         items = list(_container(db, "households").query_items(q, enable_cross_partition_query=True))
-        return func.HttpResponse(json.dumps(items), status_code=200, mimetype="application/json")
+        return _cors(
+            func.HttpResponse(json.dumps(items), status_code=200, mimetype="application/json")
+        )
     try:
         body = req.get_json()
     except ValueError:
@@ -97,12 +116,16 @@ def http_households(req: func.HttpRequest) -> func.HttpResponse:
     doc = {"id": str(uuid.uuid4()), "name": name, "createdAt": _now()}
     _container(db, "households").upsert_item(doc)
     logging.info("admin: created household %s", doc["id"])
-    return func.HttpResponse(json.dumps(doc), status_code=201, mimetype="application/json")
+    return _cors(func.HttpResponse(json.dumps(doc), status_code=201, mimetype="application/json"))
 
 
-@bp.route(route="chronicles", methods=["GET", "POST"], auth_level=func.AuthLevel.ANONYMOUS)
+@bp.route(
+    route="chronicles", methods=["GET", "POST", "OPTIONS"], auth_level=func.AuthLevel.ANONYMOUS
+)
 def http_chronicles(req: func.HttpRequest) -> func.HttpResponse:
     db = _db()
+    if req.method == "OPTIONS":
+        return _cors(func.HttpResponse("", status_code=204))
     if db is None:
         return _fail("Cosmos not configured", 503)
     if req.method == "GET":
@@ -112,7 +135,9 @@ def http_chronicles(req: func.HttpRequest) -> func.HttpResponse:
         query = "SELECT * FROM c WHERE c.householdId = @hid"
         params = [{"name": "@hid", "value": household_id}]
         items = list(_container(db, "chronicles").query_items(query, parameters=params))
-        return func.HttpResponse(json.dumps(items), status_code=200, mimetype="application/json")
+        return _cors(
+            func.HttpResponse(json.dumps(items), status_code=200, mimetype="application/json")
+        )
     try:
         body = req.get_json()
     except ValueError:
@@ -126,12 +151,16 @@ def http_chronicles(req: func.HttpRequest) -> func.HttpResponse:
     doc = {"id": str(uuid.uuid4()), "householdId": household_id, "name": name, "createdAt": _now()}
     _container(db, "chronicles").upsert_item(doc)
     logging.info("admin: created chronicle %s", doc["id"])
-    return func.HttpResponse(json.dumps(doc), status_code=201, mimetype="application/json")
+    return _cors(func.HttpResponse(json.dumps(doc), status_code=201, mimetype="application/json"))
 
 
-@bp.route(route="contributors", methods=["GET", "POST"], auth_level=func.AuthLevel.ANONYMOUS)
+@bp.route(
+    route="contributors", methods=["GET", "POST", "OPTIONS"], auth_level=func.AuthLevel.ANONYMOUS
+)
 def http_contributors(req: func.HttpRequest) -> func.HttpResponse:
     db = _db()
+    if req.method == "OPTIONS":
+        return _cors(func.HttpResponse("", status_code=204))
     if db is None:
         return _fail("Cosmos not configured", 503)
     if req.method == "GET":
@@ -141,7 +170,9 @@ def http_contributors(req: func.HttpRequest) -> func.HttpResponse:
         query = "SELECT * FROM c WHERE c.householdId = @hid"
         params = [{"name": "@hid", "value": household_id}]
         items = list(_container(db, "contributors").query_items(query, parameters=params))
-        return func.HttpResponse(json.dumps(items), status_code=200, mimetype="application/json")
+        return _cors(
+            func.HttpResponse(json.dumps(items), status_code=200, mimetype="application/json")
+        )
     try:
         body = req.get_json()
     except ValueError:
@@ -164,4 +195,4 @@ def http_contributors(req: func.HttpRequest) -> func.HttpResponse:
     }
     _container(db, "contributors").upsert_item(doc)
     logging.info("admin: created contributor %s", doc["id"])
-    return func.HttpResponse(json.dumps(doc), status_code=201, mimetype="application/json")
+    return _cors(func.HttpResponse(json.dumps(doc), status_code=201, mimetype="application/json"))
