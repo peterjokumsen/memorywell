@@ -105,10 +105,20 @@ def http_chronicles(req: func.HttpRequest) -> func.HttpResponse:
     db = _db()
     if db is None:
         return _fail("Cosmos not configured", 503)
+    if req.method == "GET":
+        household_id = (req.params.get("householdId") or "").strip()
+        if not household_id:
+            return _fail("Missing householdId")
+        query = "SELECT * FROM c WHERE c.householdId = @hid"
+        params = [{"name": "@hid", "value": household_id}]
+        items = list(_container(db, "chronicles").query_items(query, parameters=params))
+        return func.HttpResponse(json.dumps(items), status_code=200, mimetype="application/json")
     try:
         body = req.get_json()
     except ValueError:
         body = {}
+    if not _is_admin(req):
+        return _fail("Forbidden", 403)
     name = (body.get("name") or "").strip()
     household_id = (body.get("householdId") or "").strip()
     if not name or not household_id:
@@ -124,10 +134,20 @@ def http_contributors(req: func.HttpRequest) -> func.HttpResponse:
     db = _db()
     if db is None:
         return _fail("Cosmos not configured", 503)
+    if req.method == "GET":
+        household_id = (req.params.get("householdId") or "").strip()
+        if not household_id:
+            return _fail("Missing householdId")
+        query = "SELECT * FROM c WHERE c.householdId = @hid"
+        params = [{"name": "@hid", "value": household_id}]
+        items = list(_container(db, "contributors").query_items(query, parameters=params))
+        return func.HttpResponse(json.dumps(items), status_code=200, mimetype="application/json")
     try:
         body = req.get_json()
     except ValueError:
         body = {}
+    if not _is_admin(req):
+        return _fail("Forbidden", 403)
     name = (body.get("name") or "").strip()
     household_id = (body.get("householdId") or "").strip()
     if not name or not household_id:
