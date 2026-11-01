@@ -100,7 +100,7 @@ def http_households(req: func.HttpRequest) -> func.HttpResponse:
     return func.HttpResponse(json.dumps(doc), status_code=201, mimetype="application/json")
 
 
-@bp.route(route="chronicles", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
+@bp.route(route="chronicles", methods=["GET", "POST"], auth_level=func.AuthLevel.ANONYMOUS)
 def http_chronicles(req: func.HttpRequest) -> func.HttpResponse:
     db = _db()
     if db is None:
@@ -119,7 +119,7 @@ def http_chronicles(req: func.HttpRequest) -> func.HttpResponse:
     return func.HttpResponse(json.dumps(doc), status_code=201, mimetype="application/json")
 
 
-@bp.route(route="contributors", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
+@bp.route(route="contributors", methods=["GET", "POST"], auth_level=func.AuthLevel.ANONYMOUS)
 def http_contributors(req: func.HttpRequest) -> func.HttpResponse:
     db = _db()
     if db is None:
