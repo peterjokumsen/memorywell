@@ -71,7 +71,12 @@ module containerApp './modules/containerapp.bicep' = {
 module swa './modules/swa.bicep' = {
   name: '${deployment().name}-swa'
   scope: rg
-  params: { name: 'web-${baseName}', location: location }
+  params: {
+    name: 'web-${baseName}'
+    location: location
+    cosmosAccountEndpoint: cosmosEndpoint
+    identityClientId: identityId
+  }
 }
 
 output appName string = containerApp.outputs.appName
