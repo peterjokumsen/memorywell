@@ -1,4 +1,10 @@
-import { functionsFetch as apiFetch } from "./client";
+async function apiFetch(path: string, init?: RequestInit): Promise<Response> {
+  return fetch(path, {
+    ...init,
+    credentials: "include",
+    headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
+  });
+}
 
 export async function createHousehold(name: string): Promise<any> {
   const res = await apiFetch("/api/households", { method: "POST", body: JSON.stringify({ name }) });
