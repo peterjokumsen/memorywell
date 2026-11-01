@@ -3,6 +3,7 @@ set -euo pipefail
 
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/common.sh"
 
+step "Preparing environment variables..."
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
@@ -25,13 +26,14 @@ if [[ -z "$API_BASE_URL" || -z "$FUNCTIONS_BASE_URL" ]]; then
   exit 1
 fi
 
+step "Acquiring SWA token..."
 TOKEN="$(az staticwebapp secrets list --name "web-$BASE_NAME" --resource-group "$RG_NAME" --query properties.apiKey -o tsv)"
 
 cd "$ROOT/web"
-step "Build web..."
+step "Building web..."
 npm ci
 VITE_API_BASE_URL="$API_BASE_URL" VITE_FUNCTIONS_BASE_URL="$FUNCTIONS_BASE_URL" npm run build
 
-step "Deploy web..."
+step "Deploying web..."
 npx --yes @azure/static-web-apps-cli deploy ./dist --deployment-token "$TOKEN" --env production
 echo "Published web"
