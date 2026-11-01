@@ -1,11 +1,9 @@
 import { useState } from "react";
 import { useNavigation } from "../context/useNavigation";
-import { useEasyAuth } from "../auth/useEasyAuth";
 import { createHousehold, createChronicle, createContributor } from "../api/admin";
 
 export function Administration() {
   const { childId, navigate } = useNavigation();
-  const principal = useEasyAuth();
   const [householdName, setHouseholdName] = useState("");
   const [householdId, setHouseholdId] = useState("hh-dev");
   const [chronicleName, setChronicleName] = useState("");
