@@ -7,6 +7,7 @@ export function Administration() {
   const { childId, navigate } = useNavigation();
   const principal = useEasyAuth();
   const [householdName, setHouseholdName] = useState("");
+  const [householdId, setHouseholdId] = useState("hh-dev");
   const [chronicleName, setChronicleName] = useState("");
   const [contributorName, setContributorName] = useState("");
   const [relation, setRelation] = useState("");
@@ -26,7 +27,7 @@ export function Administration() {
     );
   }
 
-  const handleHousehold = async (e: React.FormEvent) => {
+  const handleHousehold = async (e: React.SubmitEvent) => {
     e.preventDefault();
     try {
       await createHousehold(householdName);
@@ -37,10 +38,10 @@ export function Administration() {
     }
   };
 
-  const handleChronicle = async (e: React.FormEvent) => {
+  const handleChronicle = async (e: React.SubmitEvent) => {
     e.preventDefault();
     try {
-      await createChronicle("hh-dev", chronicleName);
+      await createChronicle(householdId, chronicleName);
       setMessage(`Chronicle "${chronicleName}" added.`);
       setChronicleName("");
     } catch {
@@ -48,10 +49,10 @@ export function Administration() {
     }
   };
 
-  const handleContributor = async (e: React.FormEvent) => {
+  const handleContributor = async (e: React.SubmitEvent) => {
     e.preventDefault();
     try {
-      await createContributor("hh-dev", {
+      await createContributor(householdId, {
         name: contributorName,
         canonicalRelation: relation,
         role: "Full Contributor",
@@ -98,6 +99,12 @@ export function Administration() {
       <section className="card">
         <h3 className="section-heading">Add Chronicle</h3>
         <form onSubmit={handleChronicle} style={{ display: "flex", gap: "8px" }}>
+          <input
+            className="input-capsule"
+            value={householdId}
+            onChange={(e) => setHouseholdId(e.target.value)}
+            placeholder="Household ID"
+          />
           <input
             className="input-capsule"
             value={chronicleName}
