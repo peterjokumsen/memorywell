@@ -1,19 +1,19 @@
-import { apiFetch } from "./client";
+import { functionsFetch as apiFetch } from "./client";
 
 export async function createHousehold(name: string): Promise<any> {
-  const res = await apiFetch("/households", { method: "POST", body: JSON.stringify({ name }) });
+  const res = await apiFetch("/api/households", { method: "POST", body: JSON.stringify({ name }) });
   if (!res.ok) throw new Error("Failed to create household");
   return res.json();
 }
 
 export async function listHouseholds(): Promise<any[]> {
-  const res = await apiFetch("/households");
+  const res = await apiFetch("/api/households");
   if (!res.ok) throw new Error("Failed to load households");
   return res.json();
 }
 
 export async function createChronicle(householdId: string, name: string): Promise<any> {
-  const res = await apiFetch("/chronicles", {
+  const res = await apiFetch("/api/chronicles", {
     method: "POST",
     body: JSON.stringify({ householdId, name }),
   });
@@ -34,7 +34,7 @@ export async function listContributors(householdId: string): Promise<any[]> {
 }
 
 export async function createContributor(householdId: string, payload: any): Promise<any> {
-  const res = await apiFetch("/contributors", {
+  const res = await apiFetch("/api/contributors", {
     method: "POST",
     body: JSON.stringify({ householdId, ...payload }),
   });
