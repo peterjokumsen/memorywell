@@ -5,10 +5,14 @@ info:
 
 http:
   method: GET
-  url: "{{fns_url}}/api/contributors"
+  url: "{{fns_url}}/api/contributors?householdId={{household_id}}"
   headers:
     - name: Content-Type
       value: application/json
+  params:
+    - name: householdId
+      value: "{{household_id}}"
+      type: query
   auth: inherit
 
 settings:
