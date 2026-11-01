@@ -12,8 +12,8 @@ param cosmosAccountName string
 param cosmosDatabase string
 param postgresKeyName string
 param postgresClientIp string
-param postgresAdministratorPassword string
 @secure()
+param postgresAdministratorPassword string
 param developerPrincipalObjectId string = ''
 
 var globalInputs GlobalInputs = {

@@ -9,7 +9,12 @@ STORID=$(jq -r '.foundation.storageAccountId' "$ROOT/.provision-outputs.json")
 DLQ=$(jq -r '.foundation.dlqContainerName' "$ROOT/.provision-outputs.json")
 FLU=$(jq -r '.functions.functionLogUrl' "$ROOT/.provision-outputs.json")
 run az account set --subscription "$SUBSCRIPTION_ID"
-run az deployment sub create --location "$LOCATION" --name "$DEPLOYMENT_NAME-eventgrid" --template-file "$ROOT/infra/eventgrid.bicep" \
+run_deployment "$RG_NAME" "$DEPLOYMENT_NAME-eventgrid" "$ACTION" --location "$LOCATION" --name "$DEPLOYMENT_NAME-eventgrid" --template-file "$ROOT/infra/eventgrid.bicep" \
   --parameters location="$LOCATION" baseName="$BASE_NAME" environment="$ENVIRONMENT" resourceGroupName="$RG_NAME" \
     storageAccountId="$STORID" dlqContainerName="$DLQ" functionLogUrl="$FLU" deployEventSubscriptions=true
-success "Event Grid provisioned."
+
+if [[ "$ACTION" == "what-if" ]]; then
+  info "Event Grid what-if completed."
+else
+  success "Event Grid provisioned."
+fi

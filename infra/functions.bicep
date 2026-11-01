@@ -9,7 +9,6 @@ param environment EnvironmentType
 param resourceGroupName string
 param storageAccountName string
 param deploymentContainerName string
-param serviceBusNamespaceName string = ''
 param cosmosAccountEndpoint string = ''
 param identityId string
 param identityClientId string
