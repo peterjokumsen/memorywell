@@ -12,10 +12,11 @@ STOR=$(jq -r '.foundation.storageAccountName' "$ROOT/.provision-outputs.json")
 DEP=$(jq -r '.foundation.deploymentContainerName' "$ROOT/.provision-outputs.json")
 AICS=$(jq -r '.foundation.appInsightsConnectionString' "$ROOT/.provision-outputs.json")
 CE=$(jq -r '.databases.cosmosAccountEndpoint' "$ROOT/.provision-outputs.json")
+C_D=$(jq -r '.databases.cosmosDatabaseName' "$ROOT/.provision-outputs.json")
 run az account set --subscription "$SUBSCRIPTION_ID"
 run_deployment "$RG_NAME" "$DEPLOYMENT_NAME-functions" "$ACTION" --location "$LOCATION" --name "$DEPLOYMENT_NAME-functions" --template-file "$ROOT/infra/functions.bicep" \
   --parameters location="$LOCATION" baseName="$BASE_NAME" environment="$ENVIRONMENT" resourceGroupName="$RG_NAME" \
-    storageAccountName="$STOR" deploymentContainerName="$DEP" cosmosAccountEndpoint="$CE" \
+    storageAccountName="$STOR" deploymentContainerName="$DEP" cosmosAccountEndpoint="$CE" cosmosDatabase="$C_D" \
     identityId="$FID" identityClientId="$FCL" appInsightsConnectionString="$AICS"
 
 if [[ "$ACTION" == "what-if" ]]; then

@@ -17,6 +17,15 @@ http:
       }
   auth: inherit
 
+runtime:
+  scripts:
+    - type: after-response
+      code: |-
+        if (res.status == 201 && res.getBody().id) {
+          bru.setVar('household_id', res.getBody().id);
+          console.log('household_id set');
+        }
+
 settings:
   encodeUrl: true
   timeout: 0

@@ -11,7 +11,8 @@ param deploymentContainerName string
 param serviceBusNamespace string
 param identityClientId string
 param identityId string
-param cosmosAccountEndpoint string = ''
+param cosmosAccountEndpoint string
+param cosmosDatabase string
 param appInsightsConnectionString string = ''
 
 var planName = 'plan-${inputs.global.baseName}-${inputs.global.environment}'
@@ -22,6 +23,10 @@ var baseAppSettings = [
   { name: 'AzureWebJobsStorage__accountName', value: storageAccountName }
   { name: 'AzureWebJobsStorage__credential', value: 'managedidentity' }
   { name: 'AzureWebJobsStorage__clientId', value: identityClientId }
+  { name: 'CosmosDBConnection__accountEndpoint', value: cosmosAccountEndpoint }
+  { name: 'CosmosDBConnection__credential', value: 'managedidentity' }
+  { name: 'CosmosDBConnection__clientId', value: identityClientId }
+  { name: 'CosmosDB_name', value: cosmosDatabase }
   {
     name: 'ServiceBusConnection__fullyQualifiedNamespace'
     value: '${serviceBusNamespace}.servicebus.windows.net'
@@ -33,14 +38,6 @@ var baseAppSettings = [
 var appInsightsAppSettings = empty(appInsightsConnectionString)
   ? []
   : [{ name: 'APPLICATIONINSIGHTS_CONNECTION_STRING', value: appInsightsConnectionString }]
-
-var cosmosAppSettings = empty(cosmosAccountEndpoint)
-  ? []
-  : [
-      { name: 'CosmosDBConnection__accountEndpoint', value: cosmosAccountEndpoint }
-      { name: 'CosmosDBConnection__credential', value: 'managedidentity' }
-      { name: 'CosmosDBConnection__clientId', value: identityClientId }
-    ]
 
 // Storage role assignments for the Function App's user-assigned identity.
 resource storage 'Microsoft.Storage/storageAccounts@2023-01-01' existing = {
@@ -111,7 +108,7 @@ resource app 'Microsoft.Web/sites@2023-12-01' = {
     httpsOnly: true
     siteConfig: {
       minTlsVersion: '1.2'
-      appSettings: concat(baseAppSettings, appInsightsAppSettings, cosmosAppSettings)
+      appSettings: concat(baseAppSettings, appInsightsAppSettings)
     }
     functionAppConfig: {
       runtime: {

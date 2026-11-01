@@ -13,7 +13,7 @@ http:
     type: json
     data: |-
       {
-        "householdId": "hh-dev",
+        "householdId": "{{household_id}}",
         "name": "Grandma Eleanor",
         "canonicalRelation": "Maternal Grandmother",
         "role": "Full Contributor"

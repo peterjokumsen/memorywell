@@ -13,10 +13,18 @@ http:
     type: json
     data: |-
       {
-        "householdId": "hh-dev",
+        "householdId": "{{household_id}}",
         "name": "Leo's Chronicle"
       }
   auth: inherit
+
+runtime:
+  scripts:
+    - type: after-response
+      code: |-
+        if (res.status == 201 && res.getBody().id) {
+          bru.setVar('chronicle_id', res.getBody().id)
+        }
 
 settings:
   encodeUrl: true

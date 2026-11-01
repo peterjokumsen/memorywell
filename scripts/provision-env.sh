@@ -15,12 +15,24 @@ while [[ $# -gt 0 ]]; do
 done
 init_command_log "provision-env"
 run az account set --subscription "$SUBSCRIPTION_ID"
+step "provision-foundation"
 run "$SCRIPT_DIR/provision-foundation.sh" "$ACTION"
-if [[ -z "$ONLY" || "$ONLY" == "databases" ]]; then run "$SCRIPT_DIR/provision-databases.sh" "$ACTION"; fi
+if [[ -z "$ONLY" || "$ONLY" == "databases" ]]; then
+  step "provisiono-databases"
+  run "$SCRIPT_DIR/provision-databases.sh" "$ACTION"
+fi
 if [[ -z "$ONLY" || "$ONLY" == "functions" ]]; then
+  step "publish-functions"
   run "$SCRIPT_DIR/publish-functions.sh"
+  step "provision-functions"
   run "$SCRIPT_DIR/provision-functions.sh" "$ACTION"
 fi
-if [[ -z "$ONLY" || "$ONLY" == "eventgrid" ]]; then run "$SCRIPT_DIR/provision-eventgrid.sh" "$ACTION"; fi
-if [[ -z "$ONLY" || "$ONLY" == "containerapp" ]]; then run "$SCRIPT_DIR/provision-containerapp.sh" "$ACTION"; fi
+if [[ -z "$ONLY" || "$ONLY" == "eventgrid" ]]; then
+  step "provision-eventgrid"
+  run "$SCRIPT_DIR/provision-eventgrid.sh" "$ACTION"
+fi
+if [[ -z "$ONLY" || "$ONLY" == "containerapp" ]]; then
+  step "provision-containerapp"
+  run "$SCRIPT_DIR/provision-containerapp.sh" "$ACTION"
+fi
 success "Provisioning complete. Outputs: $ROOT/.provision-outputs.json"

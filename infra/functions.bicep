@@ -9,7 +9,8 @@ param environment EnvironmentType
 param resourceGroupName string
 param storageAccountName string
 param deploymentContainerName string
-param cosmosAccountEndpoint string = ''
+param cosmosAccountEndpoint string
+param cosmosDatabase string
 param identityId string
 param identityClientId string
 param appInsightsConnectionString string
@@ -48,6 +49,7 @@ module functions './modules/functions.bicep' = {
     deploymentContainerName: deploymentContainerName
     serviceBusNamespace: serviceBus.outputs.namespaceName
     cosmosAccountEndpoint: cosmosAccountEndpoint
+    cosmosDatabase: cosmosDatabase
     identityClientId: identityClientId
     identityId: identityId
     appInsightsConnectionString: appInsightsConnectionString

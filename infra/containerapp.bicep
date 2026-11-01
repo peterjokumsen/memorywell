@@ -9,17 +9,14 @@ param environment EnvironmentType
 param resourceGroupName string
 param acrLoginServer string
 param identityId string
-param identityClientId string
-param identityPrincipalId string
 param monitorCustomerId string
 param monitorWorkspaceId string
 param monitorApiVersion string
 param appInsightsConnectionString string
-param managedEnvironmentId string = ''
-param cosmosDatabase string = 'not-provisioned'
-param cosmosEndpoint string = 'not-provisioned'
-param keyVaultUri string = 'not-provisioned'
-param postgresConnKey string = 'not-provisioned'
+param cosmosDatabase string
+param cosmosEndpoint string
+param keyVaultUri string
+param postgresConnKey string
 param containerImage string = 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'
 
 var globalInputs GlobalInputs = {
