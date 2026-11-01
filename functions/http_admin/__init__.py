@@ -7,7 +7,7 @@ import uuid
 
 import azure.functions as func
 from azure.cosmos import CosmosClient, PartitionKey
-from azure.identity import DefaultAzureCredential
+from azure.identity import ManagedIdentityCredential
 
 bp = func.Blueprint()
 
@@ -48,10 +48,14 @@ def _db():
     endpoint = os.environ.get("COSMOS_ENDPOINT") or os.environ.get(
         "CosmosDBConnection__accountEndpoint"
     )
-    database = os.environ.get("COSMOS_DATABASE") or "memorywell"
+    database = os.environ.get("CosmosDB_name") or "memorywell"
     if not endpoint:
         return None
-    client = CosmosClient(endpoint, credential=DefaultAzureCredential())
+    client_id = os.environ.get("CosmosDBConnection__clientId")
+    credential = (
+        ManagedIdentityCredential(client_id=client_id) if client_id else ManagedIdentityCredential()
+    )
+    client = CosmosClient(endpoint, credential=credential)
     return client.get_database_client(database)
 
 
