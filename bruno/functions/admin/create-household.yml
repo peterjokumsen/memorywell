@@ -1,0 +1,25 @@
+info:
+  name: Create household
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: "{{fns_url}}/api/households"
+  headers:
+    - name: Content-Type
+      value: application/json
+  body:
+    type: json
+    data: |-
+      {
+        "name": "My Household"
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

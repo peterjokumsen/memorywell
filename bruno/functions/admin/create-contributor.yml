@@ -1,0 +1,28 @@
+info:
+  name: Create contributor
+  type: http
+  seq: 3
+
+http:
+  method: POST
+  url: "{{fns_url}}/api/contributors"
+  headers:
+    - name: Content-Type
+      value: application/json
+  body:
+    type: json
+    data: |-
+      {
+        "householdId": "hh-dev",
+        "name": "Grandma Eleanor",
+        "canonicalRelation": "Maternal Grandmother",
+        "role": "Full Contributor"
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false
