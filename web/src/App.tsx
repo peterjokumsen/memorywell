@@ -3,6 +3,7 @@ import { LandingPage } from "./components/LandingPage";
 import { Dashboard } from "./components/Dashboard";
 import { ChronicleView } from "./components/ChronicleView";
 import { CircleManagement } from "./components/CircleManagement";
+import { Administration } from "./components/Administration";
 import { GuardianReview } from "./components/GuardianReview";
 import { InviteClaimView } from "./components/InviteClaimView";
 import { ThemeProvider } from "./context/ThemeContext";
@@ -24,6 +25,7 @@ function MainContent() {
         {currentRoute === "circle" && <CircleManagement />}
         {currentRoute === "guardian" && <GuardianReview />}
         {currentRoute === "invite" && <InviteClaimView />}
+        {currentRoute === "admin" && <Administration />}
       </main>
     </div>
   );
