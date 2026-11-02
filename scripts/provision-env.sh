@@ -22,10 +22,10 @@ if [[ -z "$ONLY" || "$ONLY" == "databases" ]]; then
   run "$SCRIPT_DIR/provision-databases.sh" "$ACTION"
 fi
 if [[ -z "$ONLY" || "$ONLY" == "functions" ]]; then
-  step "publish-functions"
-  run "$SCRIPT_DIR/publish-functions.sh"
   step "provision-functions"
   run "$SCRIPT_DIR/provision-functions.sh" "$ACTION"
+  step "publish-functions"
+  run "$SCRIPT_DIR/publish-functions.sh"
 fi
 if [[ -z "$ONLY" || "$ONLY" == "eventgrid" ]]; then
   step "provision-eventgrid"
@@ -34,5 +34,6 @@ fi
 if [[ -z "$ONLY" || "$ONLY" == "containerapp" ]]; then
   step "provision-containerapp"
   run "$SCRIPT_DIR/provision-containerapp.sh" "$ACTION"
+  run "$SCRIPT_DIR/publish-web.sh"
 fi
 success "Provisioning complete. Outputs: $ROOT/.provision-outputs.json"
