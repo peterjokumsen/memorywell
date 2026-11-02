@@ -5,7 +5,17 @@ import uuid
 from azure.cosmos import CosmosClient, PartitionKey
 from azure.identity import ManagedIdentityCredential
 
-CONTAINER_PKS = {"households": "/id", "chronicles": "/householdId", "contributors": "/householdId"}
+CONTAINER_PKS = {
+    "households": "/id",
+    "chronicles": "/householdId",
+    "contributors": "/householdId",
+    "invites": "/householdId",
+    "prompts": "/chronicleId",
+    "memories": "/chronicleId",
+    "transcripts": "/chronicleId",
+    "flags": "/chronicleId",
+    "aliasHistory": "/chronicleId",
+}
 
 
 def _db():
@@ -35,3 +45,13 @@ def now():
 
 def new_id():
     return str(uuid.uuid4())
+
+
+def soft_delete(doc):
+    doc["deletedAt"] = now()
+    doc["isDeleted"] = True
+    return doc
+
+
+def is_deleted(doc):
+    return bool(doc.get("isDeleted")) or doc.get("deletedAt")

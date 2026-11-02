@@ -1,0 +1,16 @@
+info:
+  name: List aliasHistory
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{api_url}}/aliasHistory"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

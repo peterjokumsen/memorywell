@@ -18,7 +18,7 @@ run az account set --subscription "$SUBSCRIPTION_ID"
 step "provision-foundation"
 run "$SCRIPT_DIR/provision-foundation.sh" "$ACTION"
 if [[ -z "$ONLY" || "$ONLY" == "databases" ]]; then
-  step "provisiono-databases"
+  step "provision-databases"
   run "$SCRIPT_DIR/provision-databases.sh" "$ACTION"
 fi
 if [[ -z "$ONLY" || "$ONLY" == "functions" ]]; then

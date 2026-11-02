@@ -9,6 +9,7 @@ param environment EnvironmentType
 param resourceGroupName string
 param acrLoginServer string
 param identityId string
+param identityClientId string
 param monitorCustomerId string
 param monitorWorkspaceId string
 param monitorApiVersion string
@@ -75,7 +76,8 @@ module swa './modules/swa.bicep' = {
     name: 'web-${baseName}'
     location: location
     cosmosAccountEndpoint: cosmosEndpoint
-    identityClientId: identityId
+    cosmosDatabase: cosmosDatabase
+    identityClientId: identityClientId
   }
 }
 

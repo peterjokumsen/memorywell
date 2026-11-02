@@ -1,0 +1,21 @@
+info:
+  name: Update memories
+  type: http
+  seq: 4
+
+http:
+  method: PUT
+  url: "{{api_url}}/memories/{{id}}"
+  auth: inherit
+
+body:
+  type: json
+  content: |
+    {}
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false
