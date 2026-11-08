@@ -33,6 +33,7 @@ def make_blueprint(entity, pk_field, required_fields=None, defaults=None, partit
             return doc_or_params.get(pk_field)
         return doc_or_params.get(pk_field) if hasattr(doc_or_params, "get") else None
 
+    @bp.function_name(f"{entity}_collection")
     @bp.route(route=entity, methods=["GET", "POST", "OPTIONS"], auth_level=func.AuthLevel.ANONYMOUS)
     def collection(req):
         db = _db()
@@ -78,6 +79,7 @@ def make_blueprint(entity, pk_field, required_fields=None, defaults=None, partit
         logging.info("created %s %s", entity, doc["id"])
         return _resp(doc, 201)
 
+    @bp.function_name(f"{entity}_item")
     @bp.route(
         route=f"{entity}/{{id}}",
         methods=["GET", "PUT", "PATCH", "DELETE", "OPTIONS"],
