@@ -34,6 +34,11 @@ resource deploymentContainer 'Microsoft.Storage/storageAccounts/blobServices/con
   name: toLower('app-package-func-${inputs.global.baseName}-${inputs.global.environment}')
 }
 
+resource bffDeploymentContainer 'Microsoft.Storage/storageAccounts/blobServices/containers@2023-01-01' = {
+  parent: blobService
+  name: 'bff-deployment'
+}
+
 resource voiceContainer 'Microsoft.Storage/storageAccounts/blobServices/containers@2023-01-01' = {
   parent: blobService
   name: 'voice-notes'
@@ -48,3 +53,4 @@ output storageAccountId string = sa.id
 output storageAccountName string = sa.name
 output dlqContainerName string = dlqContainer.name
 output deploymentContainerName string = deploymentContainer.name
+output bffDeploymentContainerName string = bffDeploymentContainer.name
