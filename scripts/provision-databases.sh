@@ -5,6 +5,7 @@ ACTION="${1:-create}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 init_command_log "provision-databases"
+step "Provisioning databases..."
 DEPLOYMENT_NAME="$(deployment_name)"
 F=$(jq -r '.foundation.identityPrincipalId' "$ROOT/.provision-outputs.json")
 run az account set --subscription "$SUBSCRIPTION_ID"

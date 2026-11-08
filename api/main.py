@@ -1,9 +1,12 @@
-from fastapi import FastAPI, File, UploadFile
+import httpx
+from fastapi import FastAPI, File, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel
 
 from curator import list_memories, record_memory
 from prompter import PromptContext, generate_question
+from proxy import FUNCTIONS_BASE_URL, SERVICES_BASE_URL, forward
 from telemetry import configure_telemetry
 
 app = FastAPI()
@@ -113,3 +116,115 @@ def get_memories(chronicle_id: str):
         )
         for m in list_memories(chronicle_id)
     ]
+
+
+ENTITIES = [
+    "households",
+    "chronicles",
+    "contributors",
+    "invites",
+    "prompts",
+    "memories",
+    "transcripts",
+    "flags",
+    "aliasHistory",
+]
+
+
+async def _proxy_response(resp: httpx.Response) -> Response:
+    if resp.status_code == 204:
+        return Response(status_code=204)
+    try:
+        data = resp.json()
+    except Exception:
+        data = resp.text
+    return JSONResponse(status_code=resp.status_code, content=data)
+
+
+# Entity proxy routes
+for _entity in ENTITIES:
+
+    async def _list(entity=_entity, request: Request = None):
+        resp = await forward(
+            SERVICES_BASE_URL, f"/{entity}", "GET", params=dict(request.query_params)
+        )
+        return await _proxy_response(resp)
+
+    async def _get(entity=_entity, item_id: str = "", request: Request = None):
+        resp = await forward(
+            SERVICES_BASE_URL, f"/{entity}/{item_id}", "GET", params=dict(request.query_params)
+        )
+        return await _proxy_response(resp)
+
+    async def _create(entity=_entity, request: Request = None):
+        body = (
+            await request.json()
+            if request.headers.get("content-type", "").startswith("application/json")
+            else None
+        )
+        resp = await forward(
+            SERVICES_BASE_URL,
+            f"/{entity}",
+            "POST",
+            json_body=body,
+            params=dict(request.query_params),
+        )
+        return await _proxy_response(resp)
+
+    async def _update(entity=_entity, item_id: str = "", request: Request = None):
+        body = (
+            await request.json()
+            if request.headers.get("content-type", "").startswith("application/json")
+            else None
+        )
+        resp = await forward(
+            SERVICES_BASE_URL,
+            f"/{entity}/{item_id}",
+            "PUT",
+            json_body=body,
+            params=dict(request.query_params),
+        )
+        return await _proxy_response(resp)
+
+    async def _patch(entity=_entity, item_id: str = "", request: Request = None):
+        body = (
+            await request.json()
+            if request.headers.get("content-type", "").startswith("application/json")
+            else None
+        )
+        resp = await forward(
+            SERVICES_BASE_URL,
+            f"/{entity}/{item_id}",
+            "PATCH",
+            json_body=body,
+            params=dict(request.query_params),
+        )
+        return await _proxy_response(resp)
+
+    async def _delete(entity=_entity, item_id: str = "", request: Request = None):
+        resp = await forward(
+            SERVICES_BASE_URL, f"/{entity}/{item_id}", "DELETE", params=dict(request.query_params)
+        )
+        return await _proxy_response(resp)
+
+    app.add_api_route(f"/{_entity}", _list, methods=["GET"])
+    app.add_api_route(f"/{_entity}/{{item_id}}", _get, methods=["GET"])
+    app.add_api_route(f"/{_entity}", _create, methods=["POST"])
+    app.add_api_route(f"/{_entity}/{{item_id}}", _update, methods=["PUT"])
+    app.add_api_route(f"/{_entity}/{{item_id}}", _patch, methods=["PATCH"])
+    app.add_api_route(f"/{_entity}/{{item_id}}", _delete, methods=["DELETE"])
+
+
+# Function proxy: invite claim
+@app.post("/invites/claim")
+async def claim_invite(request: Request):
+    body = {}
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    token = (body.get("token") if isinstance(body, dict) else None) or request.query_params.get(
+        "token", ""
+    )
+    resp = await forward(FUNCTIONS_BASE_URL, "/api/invites/claim", "POST", params={"token": token})
+    return await _proxy_response(resp)

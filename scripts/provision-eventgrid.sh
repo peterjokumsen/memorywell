@@ -5,6 +5,7 @@ ACTION="${1:-create}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 init_command_log "provision-eventgrid"
+step "Provisioning eventgrid..."
 DEPLOYMENT_NAME="$(deployment_name)"
 STORID=$(jq -r '.foundation.storageAccountId' "$ROOT/.provision-outputs.json")
 DLQ=$(jq -r '.foundation.dlqContainerName' "$ROOT/.provision-outputs.json")

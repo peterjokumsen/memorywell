@@ -9,7 +9,6 @@ param environment EnvironmentType
 param resourceGroupName string
 param acrLoginServer string
 param identityId string
-param identityClientId string
 param monitorCustomerId string
 param monitorWorkspaceId string
 param monitorApiVersion string
@@ -73,11 +72,9 @@ module swa './modules/swa.bicep' = {
   name: '${deployment().name}-swa'
   scope: rg
   params: {
+    appInsightsConnectionString: appInsightsConnectionString
     name: 'web-${baseName}'
     location: location
-    cosmosAccountEndpoint: cosmosEndpoint
-    cosmosDatabase: cosmosDatabase
-    identityClientId: identityClientId
   }
 }
 

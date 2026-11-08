@@ -34,6 +34,21 @@ step "Building web..."
 npm ci
 VITE_API_BASE_URL="$API_BASE_URL" VITE_FUNCTIONS_BASE_URL="$FUNCTIONS_BASE_URL" npm run build
 
-step "Deploying web..."
-npx --yes @azure/static-web-apps-cli deploy ./dist --api-location ./api --api-language python --api-version 3.11 --deployment-token "$TOKEN" --env production
+step "Installing swa CLI..."
+npm i -g @azure/static-web-apps-cli
+
+step "Deploying web (front-end only)..."
+swa deploy ./dist --deployment-token "$TOKEN" --env production
+
+BFF_APP_NAME="$(jq -r '.bff.functionAppName // empty' "$OUTPUTS" 2>/dev/null || true)"
+if [[ -n "$BFF_APP_NAME" ]]; then
+  step "Linking BFF as bring-your-own API..."
+  BFF_RESOURCE_ID="/subscriptions/$(az account show --query id -o tsv)/resourceGroups/$RG_NAME/providers/Microsoft.Web/sites/$BFF_APP_NAME"
+  az staticwebapp backends link \
+    --name "web-$BASE_NAME" \
+    --resource-group "$RG_NAME" \
+    --backend-resource-id "$BFF_RESOURCE_ID" \
+    --backend-region "$(az staticwebapp show --name "web-$BASE_NAME" --resource-group "$RG_NAME" --query location -o tsv)"
+fi
+
 echo "Published web"
