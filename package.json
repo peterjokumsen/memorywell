@@ -9,6 +9,10 @@
   "scripts": {
     "dev:swa": "pnpm --filter web dev:swa",
     "dev:bff": "cd bff && func start --port 7071",
-    "dev:all": "pnpm dev:swa & pnpm dev:bff & wait"
+    "dev:cosmos": "bash scripts/run-cosmos-emulator.sh",
+    "dev:all": "concurrently -n web,bff,cosmos \"pnpm dev:swa\" \"pnpm dev:bff\" \"pnpm dev:cosmos\""
+  },
+  "devDependencies": {
+    "concurrently": "^9.0.0"
   }
 }
