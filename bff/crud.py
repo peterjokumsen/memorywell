@@ -81,11 +81,12 @@ def make_blueprint(entity, pk_field, required_fields=None, defaults=None, partit
 
     @bp.function_name(f"{entity}_item")
     @bp.route(
-        route=f"{entity}/{{id}}",
+        route=f"{entity}/{{item_id}}",
         methods=["GET", "PUT", "PATCH", "DELETE", "OPTIONS"],
         auth_level=func.AuthLevel.ANONYMOUS,
     )
-    def item(req, id):
+    def item(req, item_id):
+        id = item_id
         db = _db()
         if req.method == "OPTIONS":
             return _options()
