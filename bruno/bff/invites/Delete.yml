@@ -5,7 +5,7 @@ info:
 
 http:
   method: DELETE
-  url: "{{bff_url}}/invites/{{id}}"
+  url: "{{bff_url}}/api/invites/{{id}}"
   auth: inherit
 
 settings:

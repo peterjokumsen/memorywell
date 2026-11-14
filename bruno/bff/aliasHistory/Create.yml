@@ -5,7 +5,7 @@ info:
 
 http:
   method: POST
-  url: "{{bff_url}}/aliasHistory"
+  url: "{{bff_url}}/api/aliasHistory"
   auth: inherit
 
 body:

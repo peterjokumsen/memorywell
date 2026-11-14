@@ -5,7 +5,7 @@ info:
 
 http:
   method: GET
-  url: "{{bff_url}}/flags"
+  url: "{{bff_url}}/api/flags"
   auth: inherit
 
 settings:

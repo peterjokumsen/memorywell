@@ -5,7 +5,7 @@ info:
 
 http:
   method: PATCH
-  url: "{{bff_url}}/prompts/{{id}}"
+  url: "{{bff_url}}/api/prompts/{{id}}"
   auth: inherit
 
 body:

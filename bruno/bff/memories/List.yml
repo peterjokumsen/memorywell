@@ -5,7 +5,7 @@ info:
 
 http:
   method: GET
-  url: "{{bff_url}}/memories"
+  url: "{{bff_url}}/api/memories"
   auth: inherit
 
 settings:

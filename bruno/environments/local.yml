@@ -2,10 +2,10 @@ name: local
 variables:
   - name: api_url
     value: http://localhost:8000
-    description: "Local FastAPI dev server (uvicorn)"
+    description: Local FastAPI dev server (uvicorn)
   - name: fns_url
     value: http://localhost:7071
-    description: "Local Azure Functions runtime (func start)"
+    description: Local Azure Functions runtime (func start)
   - name: bff_url
     value: http://localhost:7071
-    description: "Local BFF (Functions) base URL"
+    description: Local BFF (Functions) base URL

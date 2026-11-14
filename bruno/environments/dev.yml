@@ -6,3 +6,6 @@ variables:
   - name: fns_url
     value: https://func-memwell-dev.azurewebsites.net
     description: Deployed Function App base URL (no /api suffix)
+  - name: bff_url
+    value: https://bff-memwell-dev.azurewebsites.net
+    description: Deployed BFF Function App base url

@@ -5,7 +5,7 @@ info:
 
 http:
   method: POST
-  url: "{{bff_url}}/invites/claim"
+  url: "{{bff_url}}/api/invites/claim"
   body:
     type: json
     data: |-

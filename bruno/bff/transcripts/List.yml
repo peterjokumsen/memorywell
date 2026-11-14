@@ -5,7 +5,7 @@ info:
 
 http:
   method: GET
-  url: "{{bff_url}}/transcripts"
+  url: "{{bff_url}}/api/transcripts"
   auth: inherit
 
 settings:

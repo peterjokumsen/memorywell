@@ -5,7 +5,7 @@ info:
 
 http:
   method: DELETE
-  url: "{{bff_url}}/transcripts/{{id}}"
+  url: "{{bff_url}}/api/transcripts/{{id}}"
   auth: inherit
 
 settings:
