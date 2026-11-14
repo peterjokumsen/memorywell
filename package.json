@@ -10,8 +10,9 @@
     "dev:swa": "pnpm --filter web dev:swa",
     "dev:bff": "cd bff && func start --port 7071",
     "dev:cosmos": "bash scripts/run-cosmos-emulator.sh",
+    "dev:azurite": "npx --yes azurite --silent --location /tmp/opencode/azurite",
     "dev:web": "wait-on http://localhost:7071/api/households && pnpm dev:swa",
-    "dev:all": "concurrently -n cosmos,bff,web \"pnpm dev:cosmos\" \"pnpm dev:bff\" \"pnpm dev:web\""
+    "dev:all": "concurrently -n cosmos,azurite,bff,web \"pnpm dev:cosmos\" \"pnpm dev:azurite\" \"pnpm dev:bff\" \"pnpm dev:web\""
   },
   "devDependencies": {
     "concurrently": "^9.0.0",
