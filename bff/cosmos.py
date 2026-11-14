@@ -27,12 +27,16 @@ def _db():
         return None
     key = os.environ.get("COSMOS_KEY")
     if key:
-        return CosmosClient(endpoint, credential=key).get_database_client(database)
-    client_id = os.environ.get("CosmosDBConnection__clientId")
-    cred = (
-        ManagedIdentityCredential(client_id=client_id) if client_id else ManagedIdentityCredential()
-    )
-    return CosmosClient(endpoint, credential=cred).get_database_client(database)
+        client = CosmosClient(endpoint, credential=key)
+    else:
+        client_id = os.environ.get("CosmosDBConnection__clientId")
+        cred = (
+            ManagedIdentityCredential(client_id=client_id)
+            if client_id
+            else ManagedIdentityCredential()
+        )
+        client = CosmosClient(endpoint, credential=cred)
+    return client.create_database_if_not_exists(id=database)
 
 
 def container(db, name):
