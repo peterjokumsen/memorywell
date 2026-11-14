@@ -5,7 +5,7 @@ info:
 
 http:
   method: GET
-  url: "{{api_url}}/contributors"
+  url: "{{bff_url}}/contributors"
   auth: inherit
 
 settings:

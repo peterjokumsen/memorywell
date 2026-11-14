@@ -5,7 +5,7 @@ info:
 
 http:
   method: PUT
-  url: "{{api_url}}/aliasHistory/{{id}}"
+  url: "{{bff_url}}/aliasHistory/{{id}}"
   auth: inherit
 
 body:

@@ -5,7 +5,7 @@ info:
 
 http:
   method: GET
-  url: "{{api_url}}/prompts"
+  url: "{{bff_url}}/prompts"
   auth: inherit
 
 settings:

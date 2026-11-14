@@ -5,7 +5,7 @@ info:
 
 http:
   method: POST
-  url: "{{api_url}}/prompts"
+  url: "{{bff_url}}/prompts"
   auth: inherit
 
 body:

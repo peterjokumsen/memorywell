@@ -5,7 +5,7 @@ info:
 
 http:
   method: DELETE
-  url: "{{api_url}}/memories/{{id}}"
+  url: "{{bff_url}}/memories/{{id}}"
   auth: inherit
 
 settings:

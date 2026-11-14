@@ -5,7 +5,7 @@ info:
 
 http:
   method: PATCH
-  url: "{{api_url}}/flags/{{id}}"
+  url: "{{bff_url}}/flags/{{id}}"
   auth: inherit
 
 body:
