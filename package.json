@@ -7,6 +7,8 @@
     "web"
   ],
   "scripts": {
-    "dev:swa": "pnpm --filter web dev:swa"
+    "dev:swa": "pnpm --filter web dev:swa",
+    "dev:bff": "cd bff && func start --port 7071",
+    "dev:all": "pnpm --filter web dev & (cd bff && func start --port 7071) & wait"
   }
 }
