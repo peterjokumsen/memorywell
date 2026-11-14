@@ -6,3 +6,6 @@ variables:
   - name: fns_url
     value: http://localhost:7071
     description: "Local Azure Functions runtime (func start)"
+  - name: bff_url
+    value: http://localhost:7071
+    description: "Local BFF (Functions) base URL"
