@@ -34,11 +34,8 @@ step "Building web..."
 npm ci
 VITE_API_BASE_URL="$API_BASE_URL" VITE_FUNCTIONS_BASE_URL="$FUNCTIONS_BASE_URL" npm run build
 
-step "Installing swa CLI..."
-npm i -g @azure/static-web-apps-cli
-
 step "Deploying web (front-end only)..."
-swa deploy ./dist --deployment-token "$TOKEN" --env production
+npx -y @azure/static-web-apps-cli deploy ./dist --deployment-token "$TOKEN" --env production
 
 BFF_APP_NAME="$(jq -r '.bff.functionAppName // empty' "$OUTPUTS" 2>/dev/null || true)"
 if [[ -n "$BFF_APP_NAME" ]]; then

@@ -1,7 +1,7 @@
 param appInsightsConnectionString string
 param name string
 param location string
-param sku string = 'Free'
+param sku string = 'Standard'
 
 resource swa 'Microsoft.Web/staticSites@2023-12-01' = {
   name: name

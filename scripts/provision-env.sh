@@ -55,6 +55,8 @@ if [[ -z "$ONLY" || "$ONLY" == "functions" ]]; then
   CURRENT_STEP="publish-functions"
   step "publish-functions"
   run "$SCRIPT_DIR/publish-functions.sh"
+  step "publish-bff"
+  run "$SCRIPT_DIR/publish-bff.sh"
   COMPLETED_STEPS+=("provision-functions + publish-functions")
 fi
 if [[ -z "$ONLY" || "$ONLY" == "eventgrid" ]]; then
