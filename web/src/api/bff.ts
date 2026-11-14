@@ -23,22 +23,22 @@ async function req(path: string, init?: RequestInit) {
 
 export const listEntity = (entity: Entity, params?: Record<string, string>) => {
   const qs = params ? "?" + new URLSearchParams(params).toString() : "";
-  return req(`/${entity}${qs}`);
+  return req(`/api/${entity}${qs}`);
 };
 
 export const getEntity = (entity: Entity, id: string, params?: Record<string, string>) => {
   const qs = params ? "?" + new URLSearchParams(params).toString() : "";
-  return req(`/${entity}/${id}${qs}`);
+  return req(`/api/${entity}/${id}${qs}`);
 };
 
 export const createEntity = (entity: Entity, body: any) =>
-  req(`/${entity}`, { method: "POST", body: JSON.stringify(body) });
+  req(`/api/${entity}`, { method: "POST", body: JSON.stringify(body) });
 
 export const updateEntity = (entity: Entity, id: string, body: any) =>
-  req(`/${entity}/${id}`, { method: "PUT", body: JSON.stringify(body) });
+  req(`/api/${entity}/${id}`, { method: "PUT", body: JSON.stringify(body) });
 
 export const patchEntity = (entity: Entity, id: string, body: any) =>
-  req(`/${entity}/${id}`, { method: "PATCH", body: JSON.stringify(body) });
+  req(`/api/${entity}/${id}`, { method: "PATCH", body: JSON.stringify(body) });
 
 export const deleteEntity = (entity: Entity, id: string) =>
-  req(`/${entity}/${id}`, { method: "DELETE" });
+  req(`/api/${entity}/${id}`, { method: "DELETE" });

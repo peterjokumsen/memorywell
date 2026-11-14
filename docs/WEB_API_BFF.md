@@ -19,6 +19,14 @@ For each entity `{e}`:
 
 OpenAPI spec: `GET /openapi.json`.
 
+## Local development (SWA + BFF)
+
+- Web calls the BFF through the SWA `/api` proxy using relative paths (no `VITE_API_BASE_URL`).
+- Run BFF: `cd bff && func start --port 7071`
+- Run web: `cd web && npm run dev`
+- Run SWA proxy: `cd web && npm run dev:swa`
+- Open `http://localhost:4280`.
+
 ## Type generation
 
 Run `npm run generate:api-types` in `web/` to generate `src/api/types.generated.ts`.

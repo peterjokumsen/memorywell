@@ -28,13 +28,13 @@ export async function createChronicle(householdId: string, name: string): Promis
 }
 
 export async function listChronicles(householdId: string): Promise<any[]> {
-  const res = await apiFetch(`/chronicles?householdId=${encodeURIComponent(householdId)}`);
+  const res = await apiFetch(`/api/chronicles?householdId=${encodeURIComponent(householdId)}`);
   if (!res.ok) throw new Error("Failed to load chronicles");
   return res.json();
 }
 
 export async function listContributors(householdId: string): Promise<any[]> {
-  const res = await apiFetch(`/contributors?householdId=${encodeURIComponent(householdId)}`);
+  const res = await apiFetch(`/api/contributors?householdId=${encodeURIComponent(householdId)}`);
   if (!res.ok) throw new Error("Failed to load contributors");
   return res.json();
 }

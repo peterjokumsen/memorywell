@@ -1,5 +1,11 @@
 # Memorywell — Event Catalog
 
+## Phase 3 — Messaging
+
+- Service Bus: namespace, queue (transcription jobs), topic + subscriptions.
+- Event Grid delivery; Function App triggers (stubs).
+- DLQ stays empty on happy path. No agent logic/API clients/frontend (Phases 4a–5).
+
 Central reference for every event, trigger, and message path in the project:
 **who emits it, who consumes it, and why it exists.** `docs/PLAN.md` § Architecture
 is the source of truth for _what_ the architecture is; this file is the index that
