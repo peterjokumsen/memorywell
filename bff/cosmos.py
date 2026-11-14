@@ -26,8 +26,9 @@ def _db():
     if not endpoint:
         return None
     key = os.environ.get("COSMOS_KEY")
+    verify = not ("localhost" in endpoint or os.environ.get("COSMOS_DISABLE_SSL_VERIFY") == "1")
     if key:
-        client = CosmosClient(endpoint, credential=key)
+        client = CosmosClient(endpoint, credential=key, connection_verify=verify)
     else:
         client_id = os.environ.get("CosmosDBConnection__clientId")
         cred = (
@@ -35,7 +36,7 @@ def _db():
             if client_id
             else ManagedIdentityCredential()
         )
-        client = CosmosClient(endpoint, credential=cred)
+        client = CosmosClient(endpoint, credential=cred, connection_verify=verify)
     return client.create_database_if_not_exists(id=database)
 
 
