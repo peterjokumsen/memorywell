@@ -6,7 +6,8 @@
     "start": "ng serve",
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
-    "test": "ng test"
+    "test": "ng test",
+    "generate:api-types": "npx openapi-typescript http://localhost:7071/api/openapi.json -o src/app/core/api/generated.ts"
   },
   "private": true,
   "packageManager": "pnpm@12.21.0",
