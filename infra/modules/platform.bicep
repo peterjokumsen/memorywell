@@ -140,6 +140,7 @@ module functions 'functions.bicep' = if (!databaseOnly) {
     deploymentContainerName: storage.outputs.deploymentContainerName
     serviceBusNamespace: serviceBus!.outputs.namespaceName
     cosmosAccountEndpoint: cosmos.?outputs.accountEndpoint ?? ''
+    cosmosDatabase: cosmos.?outputs.databaseName ?? ''
     identityClientId: identityClientId
     identityId: identityId
     appInsightsConnectionString: appInsights.outputs.connectionString
