@@ -1,6 +1,13 @@
 import { createContext, useContext } from "react";
 
-export type AppRoute = "welcome" | "dashboard" | "chronicle" | "circle" | "guardian" | "invite";
+export type AppRoute =
+  | "welcome"
+  | "dashboard"
+  | "chronicle"
+  | "circle"
+  | "guardian"
+  | "invite"
+  | "admin";
 
 export interface NavigationContextValue {
   currentRoute: AppRoute;
@@ -30,6 +37,9 @@ export function parsePath(pathname: string): { route: AppRoute; childId: string 
     const parts = pathname.split("/");
     const id = parts[2] || "leo";
     return { route: "chronicle", childId: id };
+  }
+  if (pathname.startsWith("/admin")) {
+    return { route: "admin", childId: "leo" };
   }
   return { route: "dashboard", childId: "leo" };
 }

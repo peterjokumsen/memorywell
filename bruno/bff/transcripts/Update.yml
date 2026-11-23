@@ -1,0 +1,21 @@
+info:
+  name: Update transcripts
+  type: http
+  seq: 4
+
+http:
+  method: PUT
+  url: "{{bff_url}}/api/transcripts/{{id}}"
+  auth: inherit
+
+body:
+  type: json
+  content: |
+    {}
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

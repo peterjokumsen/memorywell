@@ -88,7 +88,7 @@ deployment_name() {
     if [[ -n "${REUSE_DEPLOYMENT:-}" && -f "$LAST_DEPLOYMENT_FILE" ]]; then
       DEPLOYMENT_NAME="$(cat "$LAST_DEPLOYMENT_FILE")"
     else
-      DEPLOYMENT_NAME="${BASE_NAME}-${ENVIRONMENT}-$(date -u +%Y%m%d-%H%M%S)"
+      DEPLOYMENT_NAME="mw-d-$(openssl rand -hex 3)"
       printf '%s' "$DEPLOYMENT_NAME" > "$LAST_DEPLOYMENT_FILE"
     fi
     export DEPLOYMENT_NAME
@@ -112,7 +112,7 @@ deployment_name() {
     if [[ -n "${REUSE_DEPLOYMENT:-}" && -f "$LAST_DEPLOYMENT_FILE" ]]; then
       DEPLOYMENT_NAME="$(cat "$LAST_DEPLOYMENT_FILE")"
     else
-      DEPLOYMENT_NAME="${BASE_NAME}-${ENVIRONMENT}-$(date -u +%Y%m%d-%H%M%S)"
+      DEPLOYMENT_NAME="mw-d-$(openssl rand -hex 3)"
       printf '%s' "$DEPLOYMENT_NAME" > "$LAST_DEPLOYMENT_FILE"
     fi
     export DEPLOYMENT_NAME

@@ -1,0 +1,21 @@
+info:
+  name: Patch flags
+  type: http
+  seq: 5
+
+http:
+  method: PATCH
+  url: "{{bff_url}}/api/flags/{{id}}"
+  auth: inherit
+
+body:
+  type: json
+  content: |
+    {}
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

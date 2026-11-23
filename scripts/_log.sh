@@ -155,7 +155,8 @@ _join_quoted() {
 log_cmd() {
   local cmd
   cmd=$(_join_quoted "$@")
-  if [[ "${TRACE_COMMANDS:-1}" != "0" ]]; then
+  _LAST_CMD="$cmd"
+  if [[ "${VERBOSE:-0}" == "1" ]]; then
     printf '+ %s\n' "$cmd" >&2
   fi
   if [[ -n "${COMMAND_LOG:-}" ]]; then
@@ -178,12 +179,18 @@ _tee_stderr() {
 
 run() {
   log_cmd "$@"
+  local rc
   if [[ -z "${STDOUT_LOG:-}${STDERR_LOG:-}" ]]; then
     "$@"
-    return $?
+    rc=$?
+  else
+    "$@" 2> >(_tee_stderr) | tee -a "${STDOUT_LOG}"
+    rc="${PIPESTATUS[0]}"
   fi
-  "$@" 2> >(_tee_stderr) | tee -a "${STDOUT_LOG}"
-  return "${PIPESTATUS[0]}"
+  if [[ $rc -ne 0 && "${VERBOSE:-0}" != "1" ]]; then
+    printf '+ %s\n' "${_LAST_CMD:-}" >&2
+  fi
+  return $rc
 }
 
 # Hides the command's stderr on the console but keeps it in the stderr log: the

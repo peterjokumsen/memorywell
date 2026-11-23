@@ -5,10 +5,12 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:swa": "npx @azure/static-web-apps-cli start http://localhost:5173 --api-location http://localhost:7071",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "test": "vitest run"
+    "test": "vitest run",
+    "generate:api-types": "openapi-typescript src/api/openapi.json -o src/api/types.generated.ts"
   },
   "dependencies": {
     "react": "^19.3.1",

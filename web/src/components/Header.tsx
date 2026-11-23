@@ -92,6 +92,12 @@ export function Header() {
           ✉️ Claim Invite
         </button>
         <button
+          className={`pill ${currentRoute === "admin" ? "active" : ""}`}
+          onClick={() => navigate("/admin")}
+        >
+          ⚙️ Admin
+        </button>
+        <button
           className={`pill ${currentRoute === "welcome" ? "active" : ""}`}
           onClick={() => navigate("/welcome")}
         >

@@ -9,7 +9,9 @@ param environment EnvironmentType
 param resourceGroupName string
 param storageAccountName string
 param deploymentContainerName string
-param cosmosAccountEndpoint string = ''
+param bffDeploymentContainerName string = 'bff-deployment'
+param cosmosAccountEndpoint string
+param cosmosDatabase string
 param identityId string
 param identityClientId string
 param appInsightsConnectionString string
@@ -48,6 +50,22 @@ module functions './modules/functions.bicep' = {
     deploymentContainerName: deploymentContainerName
     serviceBusNamespace: serviceBus.outputs.namespaceName
     cosmosAccountEndpoint: cosmosAccountEndpoint
+    cosmosDatabase: cosmosDatabase
+    identityClientId: identityClientId
+    identityId: identityId
+    appInsightsConnectionString: appInsightsConnectionString
+  }
+}
+
+module bffFunction './modules/bff-function.bicep' = {
+  name: '${deployment().name}-bff'
+  scope: rg
+  params: {
+    inputs: inputs
+    storageAccountName: storageAccountName
+    deploymentContainerName: bffDeploymentContainerName
+    cosmosAccountEndpoint: cosmosAccountEndpoint
+    cosmosDatabase: cosmosDatabase
     identityClientId: identityClientId
     identityId: identityId
     appInsightsConnectionString: appInsightsConnectionString
@@ -58,3 +76,5 @@ output serviceBusNamespaceName string = serviceBus.outputs.namespaceName
 output functionAppName string = functions.outputs.appName
 output functionAppFqdn string = functions.outputs.defaultHostname
 output functionLogUrl string = functions.outputs.logUrl
+output bffFunctionAppName string = bffFunction.outputs.appName
+output bffFunctionAppFqdn string = bffFunction.outputs.defaultHostname

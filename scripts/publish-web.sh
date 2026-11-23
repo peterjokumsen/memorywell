@@ -1,24 +1,38 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/common.sh"
 
-RG="${1:-}"
-APP="${2:-}"
+step "Preparing..."
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-if [[ -z "$RG" || -z "$APP" ]]; then
-  echo "Usage: $0 <resource-group> <static-web-app-name>"
-  exit 1
+OUTPUTS="${1:-}"
+
+if [[ -z "$OUTPUTS" ]]; then
+  OUTPUTS="$ROOT/.provision-outputs.json"
 fi
+
+step "Acquiring SWA token..."
+TOKEN="$(az staticwebapp secrets list --name "web-$BASE_NAME" --resource-group "$RG_NAME" --query properties.apiKey -o tsv)"
 
 cd "$ROOT/web"
-if [[ -z "${VITE_API_BASE_URL:-}" ]]; then
-  echo "VITE_API_BASE_URL must be set (e.g. the Container App URL)" >&2
-  exit 1
-fi
+step "Building web..."
 npm ci
-VITE_API_BASE_URL="$VITE_API_BASE_URL" npm run build
+npm run build
 
-TOKEN="$(az staticwebapp secrets list --name "$APP" --resource-group "$RG" --query properties.apiKey -o tsv)"
-npx --yes @azure/static-web-apps-cli deploy ./dist --deployment-token "$TOKEN" --env production
-echo "Published web to $APP"
+step "Deploying web (front-end only)..."
+npx -y @azure/static-web-apps-cli deploy ./dist --deployment-token "$TOKEN" --env production
+
+BFF_APP_NAME="$(jq -r '.bff.functionAppName // empty' "$OUTPUTS" 2>/dev/null || true)"
+if [[ -n "$BFF_APP_NAME" ]]; then
+  step "Linking BFF as bring-your-own API..."
+  BFF_RESOURCE_ID="/subscriptions/$(az account show --query id -o tsv)/resourceGroups/$RG_NAME/providers/Microsoft.Web/sites/$BFF_APP_NAME"
+  az staticwebapp backends link \
+    --name "web-$BASE_NAME" \
+    --resource-group "$RG_NAME" \
+    --backend-resource-id "$BFF_RESOURCE_ID" \
+    --backend-region "$(az staticwebapp show --name "web-$BASE_NAME" --resource-group "$RG_NAME" --query location -o tsv)"
+fi
+
+echo "Published web"

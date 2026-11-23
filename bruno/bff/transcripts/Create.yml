@@ -1,0 +1,21 @@
+info:
+  name: Create transcripts
+  type: http
+  seq: 3
+
+http:
+  method: POST
+  url: "{{bff_url}}/api/transcripts"
+  auth: inherit
+
+body:
+  type: json
+  content: |
+    {}
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

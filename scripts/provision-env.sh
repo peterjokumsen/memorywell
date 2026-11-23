@@ -14,13 +14,65 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 init_command_log "provision-env"
+
+COMPLETED_STEPS=()
+CURRENT_STEP=""
+on_error() {
+  local rc=$?
+  error "Provisioning failed (exit $rc)."
+  if [[ -n "$CURRENT_STEP" ]]; then
+    error "Failed step: $CURRENT_STEP"
+  fi
+  if (( ${#COMPLETED_STEPS[@]} > 0 )); then
+    success "Steps completed successfully before failure:"
+    for s in "${COMPLETED_STEPS[@]}"; do
+      success "  - $s"
+    done
+  else
+    warn "No steps completed successfully before failure."
+  fi
+  exit "$rc"
+}
+trap on_error ERR
+
 run az account set --subscription "$SUBSCRIPTION_ID"
+
+CURRENT_STEP="provision-foundation"
+step "provision-foundation"
 run "$SCRIPT_DIR/provision-foundation.sh" "$ACTION"
-if [[ -z "$ONLY" || "$ONLY" == "databases" ]]; then run "$SCRIPT_DIR/provision-databases.sh" "$ACTION"; fi
-if [[ -z "$ONLY" || "$ONLY" == "functions" ]]; then
-  run "$SCRIPT_DIR/publish-functions.sh"
-  run "$SCRIPT_DIR/provision-functions.sh" "$ACTION"
+COMPLETED_STEPS+=("provision-foundation")
+
+if [[ -z "$ONLY" || "$ONLY" == "databases" ]]; then
+  CURRENT_STEP="provision-databases"
+  step "provision-databases"
+  run "$SCRIPT_DIR/provision-databases.sh" "$ACTION"
+  COMPLETED_STEPS+=("provision-databases")
 fi
-if [[ -z "$ONLY" || "$ONLY" == "eventgrid" ]]; then run "$SCRIPT_DIR/provision-eventgrid.sh" "$ACTION"; fi
-if [[ -z "$ONLY" || "$ONLY" == "containerapp" ]]; then run "$SCRIPT_DIR/provision-containerapp.sh" "$ACTION"; fi
+if [[ -z "$ONLY" || "$ONLY" == "functions" ]]; then
+  CURRENT_STEP="provision-functions"
+  step "provision-functions"
+  run "$SCRIPT_DIR/provision-functions.sh" "$ACTION"
+  CURRENT_STEP="publish-functions"
+  step "publish-functions"
+  run "$SCRIPT_DIR/publish-functions.sh"
+  step "publish-bff"
+  run "$SCRIPT_DIR/publish-bff.sh"
+  COMPLETED_STEPS+=("provision-functions + publish-functions")
+fi
+if [[ -z "$ONLY" || "$ONLY" == "eventgrid" ]]; then
+  CURRENT_STEP="provision-eventgrid"
+  step "provision-eventgrid"
+  run "$SCRIPT_DIR/provision-eventgrid.sh" "$ACTION"
+  COMPLETED_STEPS+=("provision-eventgrid")
+fi
+if [[ -z "$ONLY" || "$ONLY" == "containerapp" ]]; then
+  CURRENT_STEP="provision-containerapp"
+  step "provision-containerapp"
+  run "$SCRIPT_DIR/provision-containerapp.sh" "$ACTION"
+  CURRENT_STEP="publish-web"
+  step "publish-web"
+  run "$SCRIPT_DIR/publish-web.sh"
+  COMPLETED_STEPS+=("provision-containerapp + publish-web")
+fi
+CURRENT_STEP=""
 success "Provisioning complete. Outputs: $ROOT/.provision-outputs.json"

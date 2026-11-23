@@ -1,5 +1,12 @@
 # Current Database Schema (pre-overhaul)
 
+## Phase 2 — Data Layer (provisioning)
+
+- Group A: Cosmos DB for NoSQL (account, database, containers).
+- Group B: PostgreSQL Flexible Server (server, database, pgvector).
+- Group C: Redis cache.
+- Seeded with invariant-correct sample data. No agents/API clients/messaging (Phases 3–4).
+
 Snapshot of data stores as implemented today. Source of truth: `scripts/seed.py`,
 `infra/modules/cosmos.bicep`, `infra/modules/postgres.bicep`.
 

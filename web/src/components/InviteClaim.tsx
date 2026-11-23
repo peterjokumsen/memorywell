@@ -7,7 +7,7 @@ export function InviteClaim() {
 
   async function claim() {
     try {
-      const res = await apiFetch("/api/invites/claim", {
+      const res = await apiFetch("/invites/claim", {
         method: "POST",
         body: JSON.stringify({ token }),
       });

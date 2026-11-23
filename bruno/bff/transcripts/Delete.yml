@@ -1,0 +1,16 @@
+info:
+  name: Delete transcripts
+  type: http
+  seq: 6
+
+http:
+  method: DELETE
+  url: "{{bff_url}}/api/transcripts/{{id}}"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

@@ -72,6 +72,7 @@ output identityPrincipalId string = identity.outputs.principalId
 output storageAccountName string = storage.outputs.storageAccountName
 output storageAccountId string = storage.outputs.storageAccountId
 output deploymentContainerName string = storage.outputs.deploymentContainerName
+output bffDeploymentContainerName string = storage.outputs.bffDeploymentContainerName
 output dlqContainerName string = storage.outputs.dlqContainerName
 output monitorCustomerId string = monitoring.outputs.customerId
 output monitorWorkspaceId string = monitoring.outputs.workspaceId
