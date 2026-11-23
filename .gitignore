@@ -236,3 +236,9 @@ build/bicep/
 # Script command logs (local run history, never commit)
 logs/
 .provision-outputs.json
+
+
+
+.nx/cache
+.nx/workspace-data
+.nx/migrate-runs
