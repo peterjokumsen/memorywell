@@ -60,10 +60,10 @@ jobs:
         with:
           python-version: "3.11"
           cache: pip
-          cache-dependency-path: api/requirements.txt
+          cache-dependency-path: backends/api/requirements.txt
 
       - name: Install dependencies
-        working-directory: api
+        working-directory: backends/api
         run: |
           set -euo pipefail
           python -m pip install --upgrade pip
@@ -72,7 +72,7 @@ jobs:
       # Tests import `main` via a sys.path insert, so pytest runs from api/.
       # Add functions/ later as its own job once it exists.
       - name: Run pytest
-        working-directory: api
+        working-directory: backends/api
         run: pytest -q
 
   bff:
@@ -88,17 +88,17 @@ jobs:
         with:
           python-version: "3.11"
           cache: pip
-          cache-dependency-path: bff/requirements.txt
+          cache-dependency-path: bffs/web-bff/requirements.txt
 
       - name: Install dependencies
-        working-directory: bff
+        working-directory: bffs/web-bff
         run: |
           set -euo pipefail
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
       - name: Run pytest
-        working-directory: bff
+        working-directory: bffs/web-bff
         run: pytest -q
 
   web:
@@ -114,18 +114,18 @@ jobs:
         with:
           node-version: "24"
           cache: npm
-          cache-dependency-path: web/package-lock.json
+          cache-dependency-path: apps/web/package-lock.json
 
       - name: Install dependencies
-        working-directory: web
+        working-directory: apps/web
         run: npm ci
 
       - name: Run tests
-        working-directory: web
+        working-directory: apps/web
         run: npm test
 
       - name: Build
-        working-directory: web
+        working-directory: apps/web
         run: npm run build
 
   scripts:
