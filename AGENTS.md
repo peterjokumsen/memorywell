@@ -12,6 +12,21 @@ Before making, proposing, or editing any code in this repository:
 - **Document everything without duplication**: All changes should have related documentation to describe the change, if nothing exists then it should be created.
 - **Clean architecture**: Shoul apply SOLID principles for all changes, especially open-close and liskov.
 
+## 3. Documented Phases (Automatic Implementation)
+
+When a phase and its steps are documented (`docs/phase-<n>/_brief.md` plus
+`docs/phase-<n>/step-x.md`), the agent implements the entire phase
+automatically on a single branch named `phase-<n>-<brief-description>`: implement
+all steps, run the local gates, record the `## What changed` / `## Why` /
+`## ELI5` / `## Validate` sections, and open one PR for the whole phase. The
+agent never merges; the human merges.
+
+- All work happens on the `phase-<n>-<brief-description>` branch; never commit
+  directly to the default branch and do not use per-step branches/PRs.
+- Automatic implementation applies only to already-documented phases; do not
+  skip undocumented phases or pre-implement later ones.
+- The agent never silently reverts human edits pushed to the branch.
+
 ## 2. Semantic Commit Conventions
 
 All commit messages generated or suggested must adhere strictly to the **Conventional Commits** standard.
