@@ -1,6 +1,6 @@
 # Memorywell - Plan
 
-An AI-200 practice project: a "Circle of Care" time-capsule web app (see
+A "Circle of Care" time-capsule web app (see
 `INITIAL_IDEA.md`). Each household holds per-child chronicles; owners (both
 parents), contributors (relatives), and observers add text/photo/voice-note
 moments the child unlocks later. Three lightweight event-driven agents run the
@@ -35,7 +35,7 @@ on Azure) stack, which remains the core learning goal.
 
 ---
 
-## Architecture -> AI-200 domain mapping
+## Architecture
 
 ### 1. Containerized solutions (20-25%)
 
@@ -232,8 +232,10 @@ docs/         architecture.md, EVENTS.md (event catalog: emitter/consumer/purpos
 | 7           | Observability               | OpenTelemetry end-to-end, KQL workbook (incl. flag rate), DLQ alert                                                                                                                                                                            |
 | 8 - skipped | Productization              | Multi-household invites, milestone grouping polish, digest generation, JSON export / physical-book stub; freemium noted as future, out of scope                                                                                                |
 | 9           | Cheap, always-on hosting    | SWA free for web; drop Redis in prod; scale-to-zero API; Flex Consumption Functions; Log Analytics cap; cheapest OpenAI model; budget alert.                                                                                                   |
-| 10          | Data durability and backups | Cosmos continuous backup; Postgres automated backups; Blob soft delete + versioning; TTL on transient docs; backup-verify script; RPO/RTO.                                                                                                     |
-| 11          | Quality control             | Application works in dev environment and have a plan in place for deploying to production                                                                                                                                                      |
+| 10          | Review & realignment        | Audit functionality/processes, reconcile docs with code, drop AI-200 exam framing, capture follow-ups.                                                                                                                                         |
+| 11          | Overview UX                 | Household/chronicle overview dashboard UX (scope to be clarified).                                                                                                                                                                             |
+| 12          | Data durability and backups | Cosmos continuous backup; Postgres automated backups; Blob soft delete + versioning; TTL on transient docs; backup-verify script; RPO/RTO.                                                                                                     |
+| 13          | Quality control             | Application works in dev environment and have a plan in place for deploying to production                                                                                                                                                      |
 
 **Phases run in the order above**, sequentially, one step at a time — no
 skipping ahead, no pre-implementation of later steps or phases. Each phase uses a
