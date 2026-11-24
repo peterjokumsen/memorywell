@@ -1,6 +1,6 @@
 # Memorywell - Plan
 
-An AI-200 practice project: a "Circle of Care" time-capsule web app (see
+A "Circle of Care" time-capsule web app (see
 `INITIAL_IDEA.md`). Each household holds per-child chronicles; owners (both
 parents), contributors (relatives), and observers add text/photo/voice-note
 moments the child unlocks later. Three lightweight event-driven agents run the
