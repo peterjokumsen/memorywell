@@ -9,13 +9,15 @@
     "dev:cosmos": "bash scripts/run-cosmos-emulator.sh",
     "dev:azurite": "npx --yes azurite --silent --location /tmp/opencode/azurite",
     "dev:web": "wait-on http://localhost:7071/api/households && pnpm dev:swa",
-    "dev:all": "concurrently -n cosmos,azurite,bff,web \"pnpm dev:cosmos\" \"pnpm dev:azurite\" \"pnpm dev:bff\" \"pnpm dev:web\""
+    "dev:all": "concurrently -n cosmos,azurite,bff,web \"pnpm dev:cosmos\" \"pnpm dev:azurite\" \"pnpm dev:bff\" \"pnpm dev:web\"",
+    "docs:dup": "jscpd docs --min-lines 10 --min-tokens 50"
   },
   "devDependencies": {
     "@nx/angular": "^24.0.6",
     "@nx/js": "^24.0.6",
     "@nx/node": "^24.0.6",
     "concurrently": "^9.0.0",
+    "jscpd": "^4.0.0",
     "nx": "24.0.6",
     "wait-on": "^8.0.0"
   }
