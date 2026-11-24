@@ -14,6 +14,10 @@ Before making, proposing, or editing any code in this repository:
 
 ## 3. Documented Phases (Automatic Implementation)
 
+Once a phase is planned and documented, implement the entire phase on the
+`phase-<n>-<brief-description>` branch and open a single PR containing all
+changes for review before any merge.
+
 When a phase and its steps are documented (`docs/phase-<n>/_brief.md` plus
 `docs/phase-<n>/step-x.md`), the agent implements the entire phase
 automatically on a single branch named `phase-<n>-<brief-description>`: implement
