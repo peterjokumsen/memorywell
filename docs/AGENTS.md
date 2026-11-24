@@ -2,6 +2,14 @@
 
 Consolidated from Phases 4a–4c.
 
+## Execution mode
+
+Phase documentation (brief + step docs) is authored during planning. Once
+documented, the agent implements the phase automatically on a branch named
+`phase-<n>-<brief-description>`, runs the local gates, records the
+`## What changed` / `## Why` / `## ELI5` / `## Validate` sections, and opens a
+PR for review. The human validates and merges; the agent never merges.
+
 ## Phase 4a — Prompter
 
 - Persona system prompts, retrieval-augmented question generation with alias injection.
