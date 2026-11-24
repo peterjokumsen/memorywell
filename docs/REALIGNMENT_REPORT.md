@@ -2,10 +2,11 @@
 
 ## Inventory
 
-- apps: web (Angular), plus legacy?
-- backends: api (FastAPI), bffs
-- infra: bicep modules
-- scripts: provision, publish, dev
+- apps: web, web-angular
+- backends: api, functions
+- bffs: web-bff
+- libs: api-types
+- scripts, infra, docs
 
 ## Doc drift findings
 
