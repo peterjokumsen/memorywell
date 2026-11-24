@@ -35,7 +35,7 @@ on Azure) stack, which remains the core learning goal.
 
 ---
 
-## Architecture -> AI-200 domain mapping
+## Architecture
 
 ### 1. Containerized solutions (20-25%)
 
