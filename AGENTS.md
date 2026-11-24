@@ -15,18 +15,16 @@ Before making, proposing, or editing any code in this repository:
 ## 3. Documented Phases (Automatic Implementation)
 
 When a phase and its steps are documented (`docs/phase-<n>/_brief.md` plus
-`docs/phase-<n>/step-x.md`), the agent implements the phase automatically:
-create a branch named `phase-<n>-<brief-description>`, implement the steps, run
-the local gates, record the `## What changed` / `## Why` / `## ELI5` /
-`## Validate` sections, and open a PR for review. The agent never merges; the
-human merges. No per-step pause is required before starting the next step, but
-each step PR must be merged before the next step begins.
+`docs/phase-<n>/step-x.md`), the agent implements the entire phase
+automatically on a single branch named `phase-<n>-<brief-description>`: implement
+all steps, run the local gates, record the `## What changed` / `## Why` /
+`## ELI5` / `## Validate` sections, and open one PR for the whole phase. The
+agent never merges; the human merges.
 
-- All work happens on the `phase-<n>-<brief-description>` branch (or
-  `phase-<n>-<brief-description>/step-<x>` sub-branches PR'd into it); never
-  commit directly to the default branch.
-- Automatic implementation applies only to already-documented steps; do not
-  skip undocumented steps or pre-implement later phases.
+- All work happens on the `phase-<n>-<brief-description>` branch; never commit
+  directly to the default branch and do not use per-step branches/PRs.
+- Automatic implementation applies only to already-documented phases; do not
+  skip undocumented phases or pre-implement later ones.
 - The agent never silently reverts human edits pushed to the branch.
 
 ## 2. Semantic Commit Conventions
